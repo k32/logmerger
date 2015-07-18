@@ -1,0 +1,45 @@
+#+TITLE: Visual SGSN 
+#+TODO: TODO IN_PROGRESS | IMPLEMENTED TESTED
+* Features
+** TODO [#B] Node dump handling
+*** TODO [#B] Unpacking
+**** TODO [#B] Multithreaded unpacking
+*** TODO [#B] NCB detection
+*** TODO [#C] Summary generation
+** TODO [#A] Log parsing and merging
+*** Data workflow
+Raw input → List of raw entries with timestamp → List of classified items →
+Semantic-aware parsing
+*** TODO [#A] OMS logs
+*** TODO [#B] fm_alarm
+*** IMPLEMENTED [#A] Linux ringbuffer
+    CLOSED: [2015-05-12 Tue 15:45]
+**** TODO Dissection
+**** TODO Understand Erlang crashes
+**** TODO Understand DPE stuff
+***** TODO Capsule crashes
+***** TODO SR modification
+*** IMPLEMENTED [#A] isp.log
+    CLOSED: [2015-05-12 Tue 15:45]
+**** IMPLEMENTED Dissection
+     CLOSED: [2015-04-23 Thu 12:15]
+**** TODO Origins
+**** TODO Semantic analysis
+*** TODO [#B] Erlang trace
+** TODO [#A] CLI
+** TODO [#B] Gui
+*** IMPLEMENTED Decide which framework to use
+    CLOSED: [2015-06-27 Sat 16:38]
+** TODO 'tail -f' mode from a real node
+
+* TODO "Windows"
+Basically, it's a "lazy IO  made right". 
+
+We know how to open a resource. We know how to read, seek and close it. All we
+need from now on is a pure functional overlay for this and an LRU cache.
+
+Regarding the GC: the trickiest question is how to interconnect lifetime of the
+GCd haskell stuff on heap with our library commodities. Is a resource id
+(e.g. filename) enough?
+
+
