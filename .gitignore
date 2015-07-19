@@ -1,6 +1,6 @@
 *~
-src/dist
-src/.cabal-sandbox
+dist
+.cabal-sandbox
 *.hi
 *.o
 test
