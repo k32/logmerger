@@ -2,15 +2,16 @@
              GADTs, Rank2Types, TemplateHaskell #-}
 import Pipes
 import Pipes.Interleave
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
+import qualified Data.ByteString as B
 import qualified Pipes.ByteString as P
 import System.IO
 import Text.CLI
+import qualified Text.Format as Fmt
 import Network.VSGSN.Types
 import Network.VSGSN.TzInfo
 import Network.VSGSN.Logs.Util
 import Network.VSGSN.Logs.Types
+import Network.VSGSN.PrettyPrint
 import qualified Network.VSGSN.Logs.Isp as ISP
 import qualified Network.VSGSN.Logs.CLI as CLI
 -- import qualified Network.VSGSN.Logs.FMAlarm as FMA
@@ -19,6 +20,7 @@ import Control.Monad
 import Control.Monad.Warning
 import Control.Applicative
 import Control.Arrow
+import Data.String
 import Data.IORef
 import Data.Function
 import Data.Either
@@ -41,16 +43,16 @@ makeLenses ''Input
 
 data LogMerger i = 
   LogMerger {
-    _input        ∷ [i]           -- ^ List of input files
-  , _output       ∷ String        -- ^ Output stream
-  , _headerFormat ∷ String 
-  , _lineFormat   ∷ String
-  , _lmVerbosity  ∷ Int           -- ^ Level of debug messages
-  , _g_tzInfo     ∷ Maybe String  -- ^ Use this tzinfo file by default for all files
-  , _g_timeZone   ∷ DiffTime      -- ^ Store parsed tzinfo there
-  , _g_mergeSame  ∷ Bool          -- ^ Set whether entries of the same time and origin
-                                  --   Should be merged
-  , _follow       ∷ Bool          -- ^ Imitate "tail -f" behaviour
+    _input        ∷ [i]                   -- ^ List of input files
+  , _output       ∷ String                -- ^ Output stream
+  , _headerFormat ∷ B.ByteString 
+  , _lineFormat   ∷ B.ByteString
+  , _lmVerbosity  ∷ Int                   -- ^ Level of debug messages
+  , _g_tzInfo     ∷ Maybe String          -- ^ Use this tzinfo file by default for all files
+  , _g_timeZone   ∷ Maybe NominalDiffTime -- ^ Store parsed tzinfo there
+  , _g_mergeSame  ∷ Bool                  -- ^ Set whether entries of the same time and origin
+                                          --   Should be merged
+  , _follow       ∷ Bool                  -- ^ Imitate "tail -f" behaviour
   } deriving (Show)
 makeLenses ''LogMerger
 
@@ -58,15 +60,15 @@ cliDefaults ∷ LogMerger i
 cliDefaults = LogMerger {
     _input = []
   , _output = "-"
-  , _headerFormat = "~~~ $MM-$DD $hh:$mm:$ss ($origin) ~~~"
-  , _lineFormat = "$mm:$ss $txt"
+  , _headerFormat = defaultHeaderFormat
+  , _lineFormat = defaultLineFormat
   , _lmVerbosity = 0
   , _g_tzInfo = Nothing
-  , _g_timeZone = 0
+  , _g_timeZone = Nothing
   , _g_mergeSame = False
   , _follow = False
   }
-  
+
 mkInput name cfg = Input {
     _fileName = name
   , _timeOffset = 0
@@ -79,16 +81,18 @@ cliAttr = CliDescr {
     _globalAttrs = [
       CliParam "output" (Just 'o') "Output file ('-' for stdout)" $ 
         Left (set output, "FILE")
-    , CliParam "tzinfo" (Just 'z') "Path to an SGSN-MME tzinfo file" $ 
+    , CliParam "tzinfo" (Just 'i') "Path to an SGSN-MME tzinfo file" $ 
         Left (\v  → set g_tzInfo (Just v), "FILE")
+    , CliParam "timezone" (Just 'z') "Timezone (UTC ± minutes)" $ 
+        Left (\v  → set g_timeZone (Just . fromIntegral . (*60) $ read v), "TIME")
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $ 
         Right (set g_mergeSame)
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
         Right (set follow)
     , CliParam "header" Nothing "Header format of entries" $ 
-        Left (set headerFormat, "FORMAT")
+        Left (\v → set headerFormat (fromString v), "FORMAT")
     , CliParam "line" Nothing "Line format" $ 
-        Left (set lineFormat, "FORMAT")
+        Left (\v → set lineFormat (fromString v), "FORMAT")
     , CliParam "verbosity" (Just 'v') "Message verbosity" $ 
         Left (\f → set lmVerbosity (read f), "NUMBER")
     ]
@@ -98,7 +102,7 @@ cliAttr = CliDescr {
     , CliParam "offset" (Just 'o') "Specify time offset for a log" $ 
         Left (\f → set timeOffset (secondsToDiffTime $ read f), "SECONDS")
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $
-      Right (set mergeSame)
+        Right (set mergeSame)
     ]
   }
 
@@ -111,6 +115,7 @@ data GlobalVars = GlobalVars {
     _cfg    ∷ LogMerger Input
   , _resMan ∷ Fin 
   }
+makeLenses ''GlobalVars
 
 openFile'' ∷ (MonadWarning [String] String m, MonadIO m, MonadReader GlobalVars m) ⇒
              FilePath → IOMode → m Handle
@@ -144,17 +149,6 @@ openLog dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
   return $ if mgs
     then p0
     else p0 
-                
-pprint ∷ Monad m ⇒ String → String → Pipe SGSNBasicEntry P.ByteString m a
-pprint _ _ = forever $ do
-  BasicLogEntry {
-      _basic_origin = origin
-    , _basic_date = date
-    , _basic_text = txt
-    } ← await
-  P.fromLazy $ BL8.pack $ "~~~ [" ++ show origin ++ "] (" ++ show date ++ ") ~~~\n"
-  yield txt
-  P.fromLazy "\n"
 
 printWarning, printError ∷ (MonadIO m) ⇒ String → m ()
 printWarning = liftIO . hPutStrLn stderr . ("(Logmerger.hs) WARNING: " ++)
@@ -180,10 +174,14 @@ main' = do
     , _headerFormat = hf
     , _lineFormat = lf
     , _g_tzInfo = tzf
+    , _g_timeZone = tz
     } ← asks _cfg
-  localTimeOffset ← case tzf of
-    Nothing   → return 0
-    Just tzf' → errorToWarning (:[]) (const $ return 0) $ readTzInfo tzf'
+  pprint ← makeLogEntryPP hf lf
+  localTimeOffset ← case tz of 
+    Just tz' → return tz'
+    Nothing  → case tzf of
+      Nothing   → return 0
+      Just tzf' → errorToWarning (:[]) (const $ return 0) $ readTzInfo tzf'
   printInfo 3 =<< ("Configuration: " ++) . show <$> asks _cfg
   printInfo 1 $ "POSIX time offset: " ++ (show localTimeOffset)
   sink ← case outputFile of
@@ -196,7 +194,7 @@ main' = do
         lift . printInfo 2 $ "Parsers returned: " ++ show r
         lift . warning . map show $ lefts r
   runEffect $ (parsingErrors =<< merged)
-          >-> ("Broken pretty printer pipe." <! pprint hf lf)
+          >-> ("Broken pretty printer pipe." <! pprint)
           >-> ("Broken sink pipe." <! sink)
 
 logFormats ∷ (MonadWarning [String] String m) ⇒ [LogFormat m a]
