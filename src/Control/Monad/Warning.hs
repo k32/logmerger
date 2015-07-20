@@ -1,3 +1,8 @@
+-- WarningT was a mistake:
+-- 1) It doesn't print warnings until the end
+-- 2) It keeps them in RAM
+-- FIXME: Fix above mentioned
+
 {-# LANGUAGE UnicodeSyntax, BangPatterns, MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances, UndecidableInstances, LambdaCase #-}
 module Control.Monad.Warning

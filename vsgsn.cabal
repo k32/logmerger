@@ -28,6 +28,25 @@ executable LogMerger
   hs-source-dirs:      src
   default-language:    Haskell2010
 
+Test-Suite FunctionTest
+  type:                exitcode-stdio-1.0
+  main-is:             FunctionTest.hs
+  build-depends:       base >=4.8 && < 4.9
+                     , pipes >=4.1 && <4.2
+                     , bytestring >=0.10 && <0.11
+                     , pipes-bytestring >=2.1 && <2.2
+                     , mtl >=2.2 && <2.3
+                     , time >=1.5 && <1.6
+                     , containers >=0.5 && <0.6
+                     , transformers >=0.4 && <0.5
+                     , attoparsec >=0.13 && <0.14
+                     , regex-compat >=0.95 && <0.96
+                     , lens == 4.*
+                     , QuickCheck >= 2.8 && < 3.0
+  hs-source-dirs:      test src
+  default-language:    Haskell2010
+  
+
 executable LogViewer
   main-is:             LogViewer.hs
   if flag(WebUI)

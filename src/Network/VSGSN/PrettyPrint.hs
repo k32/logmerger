@@ -17,24 +17,30 @@ import Data.ByteString.Builder
 import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
 
-defaultHeaderFormat, defaultLineFormat ∷ B.ByteString
-defaultHeaderFormat = "\n~~~ ${YY}-${MM}-${DD} ${hh}:${mm}:${ss} (${origin}) ~~~\n"
-defaultLineFormat = "\n$mm:$ss> "
+defaultHeaderFormat, defaultLineFormat ∷ String
+defaultHeaderFormat = "\n~~~ ${YY}-${MM}-${DD} ${hh}:${mm}:${ss} (${origin}) ~~~"
+defaultLineFormat = "\n${hh}:${mm}:${ss} "
 
 makeLogEntryPP ∷ (Monad m2, MonadWarning [String] e m) 
-               ⇒ B.ByteString
-               → B.ByteString
+               ⇒ String
+               → String
                → m (Pipe SGSNBasicEntry B.ByteString m2 ())
 makeLogEntryPP hf lf = do
+  let fromEither = return . either (error "ERROR. Default log format is broken.") id
   hf' ← case makeFormat hf of
           Right x → return x
-          Left s → {- warning ["Wrong header format"] >> -} return . either undefined id $ makeFormat defaultHeaderFormat
+          Left s → warning ["Wrong header format"] >> 
+                   fromEither (makeFormat defaultHeaderFormat)
   lf' ← case makeFormat lf of
           Right x → return x
-          Left s → {- warning ["Wrong line format"] >> -} return . either undefined id $ makeFormat defaultLineFormat
+          Left s → warning ["Wrong line format"] >> 
+                   fromEither (makeFormat defaultLineFormat)
   return $ printLogEntry hf' lf'
 
-printLogEntry ∷ Monad m ⇒ Format → Format → Pipe SGSNBasicEntry B.ByteString m ()
+printLogEntry ∷ Monad m 
+              ⇒ Format 
+              → Format 
+              → Pipe SGSNBasicEntry B.ByteString m ()
 printLogEntry hf lf = forever $ do
   BasicLogEntry {
       _basic_origin = origin
@@ -57,10 +63,12 @@ printLogEntry hf lf = forever $ do
             "hh" → p0 i8f hour
             "mm" → p0 i8f minute
             "ss" → p0 (fromString . showFixed True) sec
-            "origin" → byteString . fromString $ show origin
+            "o" → byteString . fromString $ show origin
             a → byteString a
-      lb = format lf f
-      --txt' = {- B.intercalate lb $-} B.split '\n' txt
+      lb = toLazyByteString $ format lf f
+      newline = fromIntegral $ fromEnum '\n'
+      txt' = B.split newline txt
   format' hf f
-  yield txt
-  yield "\n"
+  forM_ txt' $ \i → do
+    P.fromLazy lb
+    yield i

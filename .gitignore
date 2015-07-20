@@ -3,4 +3,8 @@ dist
 .cabal-sandbox
 *.hi
 *.o
-test
+realtest
+*.swp
+*.prof
+*.hp
+web/3rdparty

@@ -13,6 +13,7 @@ import Data.Attoparsec.Combinator (lookAhead)
 import Data.Attoparsec.ByteString.Char8 (match, anyChar, takeTill, manyTill, endOfInput, parseOnly)
 import Control.Applicative
 import Data.Monoid
+import Data.String
 
 data Format = FStr !B.ByteString !Format | FPat !B.ByteString !Format | FNil
   deriving (Show)
@@ -26,9 +27,15 @@ fparser =
   in
     pat <|> str
 
-makeFormat ∷ B.ByteString → Either String Format
-makeFormat s = parseOnly fparser s
-  
+unescape ∷ String → B.ByteString
+unescape = fromString . u 
+  where u [] = []
+        u ('\\':'n':t) = '\n': u t
+        u (x:t) = x : u t
+
+makeFormat ∷ String → Either String Format
+makeFormat = parseOnly fparser . unescape
+
 format ∷ Format 
        → (B.ByteString → Builder) 
        → Builder

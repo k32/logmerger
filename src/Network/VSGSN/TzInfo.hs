@@ -44,7 +44,6 @@ readTzInfo f = do
   h ← openFile' f ReadMode
   c ← liftIO $ BL.hGetContents h
   liftIO $ hClose h
-  case parse tzParser c of
-   Done _ r → return r
-   Fail _ e1 e2 → throwW $ "Unable to read tzinfo: " ++ show e1 ++ "; " ++ show e2
-   _ → throwW "Unable to read tzinfo: unexpected EOF"
+  case parseOnly tzParser c of
+   Right r → return r
+   Left e → throwW $ "Unable to read tzinfo: " ++ show e

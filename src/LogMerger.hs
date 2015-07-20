@@ -45,8 +45,8 @@ data LogMerger i =
   LogMerger {
     _input        ∷ [i]                   -- ^ List of input files
   , _output       ∷ String                -- ^ Output stream
-  , _headerFormat ∷ B.ByteString 
-  , _lineFormat   ∷ B.ByteString
+  , _headerFormat ∷ String 
+  , _lineFormat   ∷ String
   , _lmVerbosity  ∷ Int                   -- ^ Level of debug messages
   , _g_tzInfo     ∷ Maybe String          -- ^ Use this tzinfo file by default for all files
   , _g_timeZone   ∷ Maybe NominalDiffTime -- ^ Store parsed tzinfo there
@@ -90,9 +90,9 @@ cliAttr = CliDescr {
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
         Right (set follow)
     , CliParam "header" Nothing "Header format of entries" $ 
-        Left (\v → set headerFormat (fromString v), "FORMAT")
+        Left (set headerFormat, "FORMAT")
     , CliParam "line" Nothing "Line format" $ 
-        Left (\v → set lineFormat (fromString v), "FORMAT")
+        Left (set lineFormat, "FORMAT")
     , CliParam "verbosity" (Just 'v') "Message verbosity" $ 
         Left (\f → set lmVerbosity (read f), "NUMBER")
     ]
@@ -145,7 +145,8 @@ openLog dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
   let follow' = if follow
                   then Just followInterval
                   else Nothing
-  p0 ← diss dt fn <$> P.fromHandleFollow follow' <$> openFile'' fn ReadMode
+  -- p0 ← diss dt fn <$> P.fromHandleFollow follow' <$> openFile'' fn ReadMode
+  p0 ← diss dt fn <$> P.fromHandle <$> openFile'' fn ReadMode
   return $ if mgs
     then p0
     else p0 
@@ -225,7 +226,7 @@ helpPostamble = unlines $ concat [
     , "EXAMPLES:"
     , "  Merge ringbuffers of all boards with ISP and CLI log:"
     , ""
-    , "    logmerger -z NCB/tzinfo NCB/isp.log NCB/cli_log/*/* PM/*/log.rb"
+    , "    logmerger -i NCB/tzinfo NCB/isp.log NCB/cli_log/*/* PM/*/log.rb"
     , ""
     , "FORMATTING:"
     , "  ${YY} - year"
@@ -234,7 +235,7 @@ helpPostamble = unlines $ concat [
     , "  ${hh} - hour"
     , "  ${mm} - minute"
     , "  ${ss} - second"
-    , "  ${origin}  - origin"
+    , "  ${o}  - origin"
     , "  ${s}  - severity"
     ]
   ]
