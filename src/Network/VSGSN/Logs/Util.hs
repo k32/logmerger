@@ -21,9 +21,13 @@ import Debug.Trace
 import Control.Monad.Warning
 import System.IO (IOMode(..), openFile, Handle)
 import Control.Exception
+import Control.Concurrent (threadDelay)
 import Data.IORef
 
 type Fin = IORef [IO ()]
+
+follow ∷ Int → IO a → IO ()
+follow d a = a >> threadDelay d >> follow d a
 
 -- | Open handle in Warning monad
 openFile' ∷ (MonadWarning [String] String m, MonadIO m) 

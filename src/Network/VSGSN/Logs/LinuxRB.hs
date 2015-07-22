@@ -16,15 +16,18 @@ import Data.Time.Clock.POSIX
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State.Strict
-import Data.Attoparsec.ByteString
-import Data.Attoparsec.ByteString.Char8
-  (
+import Data.Attoparsec.ByteString.Char8 (
     skipSpace
   , hexadecimal
   , decimal
   , isEndOfLine
   , endOfLine
   , char8
+  , Parser
+  , (<?>)
+  , takeTill
+  , takeWhile
+  , string
   )
 import Data.ByteString.Internal (c2w, w2c)
 import qualified Data.ByteString as B
@@ -39,7 +42,7 @@ logFormat ∷ (Monad m) ⇒ LogFormat m a
 logFormat = LogFormat {
     _dissector = \dt fn i → let cons' = Right () <$ i
                                 parseEntries = parse' (rbDissector dt fn) TabulaRasa
-                            in mergeSameOrigin $ cons' >-> parseEntries
+                            in cons' >-> parseEntries
   , _nameRegex = mkRegex "log\\.rb(\\.old)?$"
   , _formatName = "sgsn-mme-linux-rb"
   , _formatDescription = "Ringbuffer of SGSN-MME boards running Linux"
@@ -49,10 +52,10 @@ toNextEntry ∷ Parser (B.ByteString, (Word64, Word32))
 toNextEntry = loop ""
   where rbHead = (,) <$> ("~RB03~[" *> hex')
                      <*> (hex' <* "]")
-        further t0 t1 = char8 '~' >> (loop $ B.concat [t0, t1, "~"]) -- TODO: Possible space leak!
+        further t0 t1 = loop $ B.concat [t0, t1]
         enough t0 t1 = (B.concat [t0, t1],) <$> rbHead
         loop t0 = do
-          t1 ← takeTill (==c2w '~')
+          t1 ← takeTill (== '~')
           enough t0 t1 <|> further t0 t1
 
 type Tags = M.Map Word32 B.ByteString
@@ -69,7 +72,7 @@ getTags = do
   line "RB03" <?> "tag header"
   nTags ← "Dump of" *> dec' <* "tags\n" <?> "tag count"
   replicateM_ 2 skipAnyLine <?> "tag footer"
-  let tag = (,) <$> hex' <*> (takeTill isEndOfLine <* endOfLine) <?> "tag"
+  let tag = (,) <$> hex' <*> (takeTill (=='\n') <* endOfLine) <?> "tag"
   M.fromList <$> replicateM nTags tag 
 
 data MyState = TabulaRasa
@@ -101,20 +104,3 @@ rbDissector dt fn (GotTags tags (d, t)) = do
             Left _ → Finish
             Right (_, (d', t')) → GotTags tags (d', t')
   return $ Yield s' m
-
-mergeSameOrigin ∷ (Monad m)
-                ⇒ Producer SGSNBasicEntry m a
-                → Producer SGSNBasicEntry m a
-mergeSameOrigin p0 = loop p0 Nothing M.empty
-  where
-    mergeEntries (BasicLogEntry d1 o1 t1) (BasicLogEntry d2 o2 t2)
-      | d1 == d2 && o1 == o2 = BasicLogEntry d1 o1 $ B.concat [t1, t2]
-    loop p t m = do
-      n ← lift $ next p
-      case n of
-        Right (e@BasicLogEntry{_basic_date=t', _basic_origin=o}, p')
-          | Just t' == t → loop p' t $ M.insertWith mergeEntries o e m
-          | otherwise → mapM_ yield m >> loop p' (Just t') M.empty
-        Left r → do
-          mapM_ yield m
-          return r

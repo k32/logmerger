@@ -1,5 +1,10 @@
 {-# LANGUAGE UnicodeSyntax, Rank2Types, MultiParamTypeClasses, GADTs, KindSignatures #-}
-module Text.CLI (parseCli, CliDescr(..), CliParam(..)) where
+module Text.CLI (
+    parseCli
+  , CliDescr(..)
+  , CliParam(..)
+  , CliSetter(..)
+  ) where
 
 import System.Environment
 import Control.Monad
@@ -13,7 +18,7 @@ data CliParam ∷ * → * where
       _long ∷ String
     , _short ∷ Maybe Char
     , _descr ∷ String
-    , _setter ∷ Either (String → a → a, String) (Bool → a → a)
+    , _setter ∷ CliSetter a
     } → CliParam a
 
 data CliDescr a b =
@@ -21,6 +26,15 @@ data CliDescr a b =
       _globalAttrs ∷ [CliParam (a b)]
     , _perFileAttrs ∷ [CliParam b]
     }
+    
+data CliSetter a = 
+  CliParameter {
+    _cliParSetter ∷ String → a → a
+  , _cliParOperand ∷ String
+  } |
+  CliFlag {
+    _cliFlagSetter ∷ Bool → a → a
+  }
 
 expandCli ∷ [String] → [String]
 expandCli = (>>= f)
@@ -59,9 +73,9 @@ expandLong n = Just . (r ++)
 flagEq n f s l = (elem f) $ catMaybes [expandLong n l, expandShort n s] 
 
 match ∷ [CliParam a] → a → [String] → Maybe (a, [String])
-match (CliParam{_short = s, _long = l, _setter = Left (t, _)}:_) a (f:v:r) 
+match (CliParam{_short = s, _long = l, _setter = (CliParameter t _)}:_) a (f:v:r) 
   | flagEq True f s l = Just (t v a, r)
-match (CliParam{_short = s, _long = l, _setter = Right t}:_) a (f:r) 
+match (CliParam{_short = s, _long = l, _setter = CliFlag t}:_) a (f:r) 
   | flagEq True f s l = Just (t True a, r)
   | flagEq False f s l = Just (t False a, r)
 match (_:p) a r = match p a r 
@@ -107,14 +121,14 @@ getHelp name summary postamble descr = unlines [
   , "GLOBAL_FLAGS:"
   , _globalAttrs descr >>= par
   , ""
-  , "PER-FILE FLAGS:"
+  , "PER-FILE_FLAGS:"
   , _perFileAttrs descr >>= par
   , postamble
   ]
   where
-    par CliParam{_descr = d, _short = s, _long = l, _setter = Left (_, t)} = 
+    par CliParam{_descr = d, _short = s, _long = l, _setter = CliParameter _ t} = 
       "  --" ++ l ++ short [] s ++ " " ++ t ++ " : " ++ d ++ "\n"
-    par CliParam{_descr = d, _short = s, _long = l, _setter = Right _} = 
+    par CliParam{_descr = d, _short = s, _long = l, _setter = CliFlag _} = 
       "  --" ++ l ++ short [] s ++ " : " ++ d ++ "\n" ++
       "  --no-" ++ l ++ short "n" s ++ " : Opposite of " ++ l++"\n"
       

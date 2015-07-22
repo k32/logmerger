@@ -9,6 +9,8 @@ module Control.Monad.Warning
        (
          errorToWarning
        , errorsToWarnings
+       , justW
+       , rightW
        , WarningT(..)
        , MonadWarning(..)
        , module Control.Monad.Except
@@ -96,3 +98,11 @@ errorsToWarnings f = foldl go (return [])
           a' ← a
           r' ← r
           return $ a' : r'
+          
+justW ∷ (MonadWarning w e m) ⇒ e → Maybe a → m a
+justW _ (Just x) = return x
+justW e Nothing  = throwW e
+
+rightW ∷ (MonadWarning w e m) ⇒ Either e a → m a
+rightW (Right x) = return x
+rightW (Left e) = throwW e

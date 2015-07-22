@@ -18,8 +18,8 @@ import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
 
 defaultHeaderFormat, defaultLineFormat ∷ String
-defaultHeaderFormat = "\n~~~ ${YY}-${MM}-${DD} ${hh}:${mm}:${ss} (${origin}) ~~~"
-defaultLineFormat = "\n${hh}:${mm}:${ss} "
+defaultHeaderFormat = "\n~~~ ${YY}-${MM}-${DD} ${hh}:${mm}:${ss} (${o}) ~~~"
+defaultLineFormat = "\n|${hh}:${mm}:${ss}| "
 
 makeLogEntryPP ∷ (Monad m2, MonadWarning [String] e m) 
                ⇒ String

@@ -12,6 +12,7 @@ import Network.VSGSN.TzInfo
 import Network.VSGSN.Logs.Util
 import Network.VSGSN.Logs.Types
 import Network.VSGSN.PrettyPrint
+import Network.VSGSN.MergeSame
 import qualified Network.VSGSN.Logs.Isp as ISP
 import qualified Network.VSGSN.Logs.CLI as CLI
 -- import qualified Network.VSGSN.Logs.FMAlarm as FMA
@@ -80,31 +81,33 @@ cliAttr ∷ CliDescr LogMerger Input
 cliAttr = CliDescr {
     _globalAttrs = [
       CliParam "output" (Just 'o') "Output file ('-' for stdout)" $ 
-        Left (set output, "FILE")
+        CliParameter (set output) "FILE"
     , CliParam "tzinfo" (Just 'i') "Path to an SGSN-MME tzinfo file" $ 
-        Left (\v  → set g_tzInfo (Just v), "FILE")
+        CliParameter (g_tzInfo =§ Just) "FILE"
     , CliParam "timezone" (Just 'z') "Timezone (UTC ± minutes)" $ 
-        Left (\v  → set g_timeZone (Just . fromIntegral . (*60) $ read v), "TIME")
+        CliParameter (g_timeZone =§ (Just . fromIntegral . (*60) . read)) "TIME"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $ 
-        Right (set g_mergeSame)
+        CliFlag (set g_mergeSame)
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
-        Right (set follow)
+        CliFlag (set follow)
     , CliParam "header" Nothing "Header format of entries" $ 
-        Left (set headerFormat, "FORMAT")
+        CliParameter (set headerFormat)"FORMAT"
     , CliParam "line" Nothing "Line format" $ 
-        Left (set lineFormat, "FORMAT")
+        CliParameter (set lineFormat) "FORMAT"
     , CliParam "verbosity" (Just 'v') "Message verbosity" $ 
-        Left (\f → set lmVerbosity (read f), "NUMBER")
+        CliParameter (lmVerbosity =§ read) "NUMBER"
     ]
   , _perFileAttrs = [
       CliParam "format" (Just 'f') "Log format (used when automatic detection fails)" $ 
-        Left (\f → set format (Just f), "LOG_FORMAT")
+        CliParameter (format =§ Just) "LOG_FORMAT"
     , CliParam "offset" (Just 'o') "Specify time offset for a log" $ 
-        Left (\f → set timeOffset (secondsToDiffTime $ read f), "SECONDS")
+        CliParameter (timeOffset =§ (secondsToDiffTime . read)) "SECONDS"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $
-        Right (set mergeSame)
+        CliFlag (set mergeSame)
     ]
   }
+  where
+    s =§ f = \a → set s (f a)
 
 followInterval ∷ Int
 followInterval = 1000000
@@ -141,12 +144,15 @@ openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m , MonadReader 
           NominalDiffTime → Input → m (Producer SGSNBasicEntry m (Either [String] ()))
 openLog dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
   LogFormat {_dissector=diss} ← logFormat fmt fn
-  follow ← asks $ _follow . _cfg
+  follow ← view $ cfg . follow
   let follow' = if follow
-                  then Just followInterval
-                  else Nothing
+                  then id
+                  else id
+      mergeSame = if mgs
+                    then mergeSameOrigin
+                    else id
   -- p0 ← diss dt fn <$> P.fromHandleFollow follow' <$> openFile'' fn ReadMode
-  p0 ← diss dt fn <$> P.fromHandle <$> openFile'' fn ReadMode
+  p0 ← mergeSame <$> diss dt fn <$> P.fromHandle <$> openFile'' fn ReadMode
   return $ if mgs
     then p0
     else p0 
@@ -237,5 +243,9 @@ helpPostamble = unlines $ concat [
     , "  ${ss} - second"
     , "  ${o}  - origin"
     , "  ${s}  - severity"
+    , ""
+    , "NOTES:"
+    , "  Please note that --merge-same flag may cause reordering of log"
+    , "  entries recorded at the same time."
     ]
   ]
