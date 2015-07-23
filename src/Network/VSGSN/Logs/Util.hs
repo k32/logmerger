@@ -5,6 +5,7 @@ module Network.VSGSN.Logs.Util (
    skipAnyLine
  , openFile'
  , parse'
+ , follow
  , PResult(..)
  , (<!)
  ) where
@@ -26,8 +27,10 @@ import Data.IORef
 
 type Fin = IORef [IO ()]
 
-follow ∷ Int → IO a → IO ()
-follow d a = a >> threadDelay d >> follow d a
+follow ∷ MonadIO m ⇒ Int → m () → m r
+follow n m = forever $ do
+                m
+                liftIO $ threadDelay n
 
 -- | Open handle in Warning monad
 openFile' ∷ (MonadWarning [String] String m, MonadIO m) 

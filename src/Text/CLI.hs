@@ -130,7 +130,7 @@ getHelp name summary postamble descr = unlines [
       "  --" ++ l ++ short [] s ++ " " ++ t ++ " : " ++ d ++ "\n"
     par CliParam{_descr = d, _short = s, _long = l, _setter = CliFlag _} = 
       "  --" ++ l ++ short [] s ++ " : " ++ d ++ "\n" ++
-      "  --no-" ++ l ++ short "n" s ++ " : Opposite of " ++ l++"\n"
+      "  --no-" ++ l ++ short "n" s ++ " : Opposite of --" ++ l++"\n"
       
     short _ Nothing = ""
     short n (Just c) = " (-" ++ n ++ [c, ')']

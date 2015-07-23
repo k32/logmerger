@@ -1,5 +1,5 @@
 {-# LANGUAGE UnicodeSyntax, OverloadedStrings, FlexibleContexts, 
-             GADTs, Rank2Types, TemplateHaskell #-}
+             GADTs, Rank2Types, TemplateHaskell, LambdaCase #-}
 import Pipes
 import Pipes.Interleave
 import qualified Data.ByteString as B
@@ -53,7 +53,7 @@ data LogMerger i =
   , _g_timeZone   ∷ Maybe NominalDiffTime -- ^ Store parsed tzinfo there
   , _g_mergeSame  ∷ Bool                  -- ^ Set whether entries of the same time and origin
                                           --   Should be merged
-  , _follow       ∷ Bool                  -- ^ Imitate "tail -f" behaviour
+  , _g_follow     ∷ Bool                  -- ^ Imitate "tail -f" behaviour
   } deriving (Show)
 makeLenses ''LogMerger
 
@@ -67,7 +67,7 @@ cliDefaults = LogMerger {
   , _g_tzInfo = Nothing
   , _g_timeZone = Nothing
   , _g_mergeSame = False
-  , _follow = False
+  , _g_follow = False
   }
 
 mkInput name cfg = Input {
@@ -89,7 +89,7 @@ cliAttr = CliDescr {
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $ 
         CliFlag (set g_mergeSame)
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
-        CliFlag (set follow)
+        CliFlag (set g_follow)
     , CliParam "header" Nothing "Header format of entries" $ 
         CliParameter (set headerFormat)"FORMAT"
     , CliParam "line" Nothing "Line format" $ 
@@ -140,19 +140,19 @@ logFormat fmt fname =
                  Nothing → find (isJust . (flip matchRegex) fname . _nameRegex)
                  Just fmt' → find ((==fmt') . _formatName)
 
+-- TODO: Refactor me
 openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m , MonadReader GlobalVars m) ⇒
           NominalDiffTime → Input → m (Producer SGSNBasicEntry m (Either [String] ()))
 openLog dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
   LogFormat {_dissector=diss} ← logFormat fmt fn
-  follow ← view $ cfg . follow
-  let follow' = if follow
-                  then id
-                  else id
-      mergeSame = if mgs
+  follow' ← view (cfg . g_follow) >>= \case
+              True → return $ follow followInterval
+              False → return id
+  let mergeSame = if mgs
                     then mergeSameOrigin
                     else id
   -- p0 ← diss dt fn <$> P.fromHandleFollow follow' <$> openFile'' fn ReadMode
-  p0 ← mergeSame <$> diss dt fn <$> P.fromHandle <$> openFile'' fn ReadMode
+  p0 ← mergeSame <$> diss dt fn <$> follow' <$> P.fromHandle <$> openFile'' fn ReadMode
   return $ if mgs
     then p0
     else p0 
