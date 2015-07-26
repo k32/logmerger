@@ -35,7 +35,10 @@ data BasicLogEntry o =
     _basic_date   ∷ DateTime
   , _basic_origin ∷ Origin o
   , _basic_text   ∷ B.ByteString
-  } deriving (Data, Typeable)
+  } deriving (Eq, Data, Typeable)
+
+instance (Eq o) ⇒ Ord (BasicLogEntry o) where
+  compare a b = compare (_basic_date a) (_basic_date b)
 
 deriving instance (Show o) ⇒ Show (BasicLogEntry o)
 
