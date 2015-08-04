@@ -7,7 +7,6 @@ module Network.VSGSN.Logs.Isp
 
 import Control.Applicative
 import Control.Monad
-import Debug.Trace
 import Data.Attoparsec.ByteString
 import Data.Attoparsec.ByteString.Char8 (
     skipSpace
@@ -25,18 +24,14 @@ import Prelude hiding (takeWhile)
 
 logFormat ∷ (Monad m) ⇒ LogFormat m a
 logFormat = LogFormat {
-    _dissector = \_ fn i → let cons' = Right () <$ i
-                           in cons' >-> parse' (ispDissector fn) Beginning
+    _dissector = ispDissector
   , _nameRegex = mkRegex "isp.log$"
   , _formatName = "sgsn-mme-isp"
   , _formatDescription = "Isp log of SGSN-MME nodes"
   }
 
-data MyState = Beginning | Normal
-             deriving (Show)
-                      
-ispDissector ∷ FilePath → MyState → Parser (PResult MyState SGSNBasicEntry ())
-ispDissector _ Beginning = skipAnyLine >> skipAnyLine >> return (Loop Normal)
+ispDissector ∷ NominalDiffTime → FilePath → MyState → Parser (PResult MyState SGSNBasicEntry ())
+ispDissector _  = skipAnyLine >> skipAnyLine >> return (Loop Normal)
 ispDissector file Normal = do
   day ← fromGregorian <$> decimal <*> ("-" *> decimal) <*> ("-" *> decimal) <* skipSpace
   (hh, mm, ss) ← (,,) <$> decimal <*> (":" *> decimal) <*> (":" *> decimal) <* skipSpace

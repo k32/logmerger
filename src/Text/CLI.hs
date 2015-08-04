@@ -10,7 +10,6 @@ import System.Environment
 import Control.Monad
 import Data.Maybe (catMaybes)
 import Data.List
-import Debug.Trace
 import qualified Data.Set as S
 
 data CliParam ∷ * → * where

@@ -7,7 +7,6 @@ module Network.VSGSN.Logs.CLI
 
 import Control.Applicative
 import Control.Monad
-import Debug.Trace
 import Data.Attoparsec.ByteString
 import Data.Attoparsec.ByteString.Char8 (
     skipSpace

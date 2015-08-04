@@ -12,7 +12,6 @@ import Control.Applicative
 import Data.List
 import Data.Function
 import Data.Either
-import Debug.Trace
 
 interleaveBy ∷ (Monad m) 
              ⇒ (a → a → Ordering)

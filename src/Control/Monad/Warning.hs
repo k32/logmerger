@@ -5,18 +5,17 @@
 
 {-# LANGUAGE UnicodeSyntax, BangPatterns, MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances, UndecidableInstances, LambdaCase #-}
-module Control.Monad.Warning
-       (
-         errorToWarning
-       , errorsToWarnings
-       , justW
-       , rightW
-       , WarningT(..)
-       , MonadWarning(..)
-       , module Control.Monad.Except
-       , module Control.Monad.Writer
-       )
-       where
+module Control.Monad.Warning (
+   errorToWarning
+ , errorsToWarnings
+ , justW
+ , rightW
+ , WarningT(..)
+ , MonadWarning(..)
+ , module Control.Monad.Except
+ , module Control.Monad.Writer
+ )
+ where
 
 import Control.Applicative
 import Control.Monad.Except
@@ -103,6 +102,6 @@ justW ∷ (MonadWarning w e m) ⇒ e → Maybe a → m a
 justW _ (Just x) = return x
 justW e Nothing  = throwW e
 
-rightW ∷ (MonadWarning w e m) ⇒ Either e a → m a
-rightW (Right x) = return x
-rightW (Left e) = throwW e
+rightW ∷ (MonadWarning w e m) ⇒ (e' → e) → Either e' a → m a
+rightW _ (Right x) = return x
+rightW f (Left e) = throwW (f e)

@@ -13,8 +13,8 @@ import Network.VSGSN.Logs.Util
 import Network.VSGSN.Logs.Types
 import Network.VSGSN.PrettyPrint
 import Network.VSGSN.MergeSame
-import qualified Network.VSGSN.Logs.Isp as ISP
-import qualified Network.VSGSN.Logs.CLI as CLI
+-- import qualified Network.VSGSN.Logs.Isp as ISP
+-- import qualified Network.VSGSN.Logs.CLI as CLI
 -- import qualified Network.VSGSN.Logs.FMAlarm as FMA
 import qualified Network.VSGSN.Logs.LinuxRB as LinRB
 import Control.Monad
@@ -131,7 +131,7 @@ openFile'' fp fm = do
 cleanup ∷ Fin → IO ()
 cleanup ff = readIORef ff >>= sequence_ 
 
-logFormat ∷ (MonadWarning [String] String m) ⇒ Maybe String → String → m (LogFormat m a)
+logFormat ∷ (MonadWarning [String] String m) ⇒ Maybe String → String → m LogFormat
 logFormat fmt fname =
    case isOk logFormats of
     Nothing → throwW $ "Can't determine format of " ++ fname ++ ". Skipping."
@@ -204,8 +204,8 @@ main' = do
           >-> ("Broken pretty printer pipe." <! pprint)
           >-> ("Broken sink pipe." <! sink)
 
-logFormats ∷ (MonadWarning [String] String m) ⇒ [LogFormat m a]
-logFormats = [ISP.logFormat, CLI.logFormat, LinRB.logFormat]
+logFormats ∷ [LogFormat]
+logFormats = [{- ISP.logFormat, CLI.logFormat, -} LinRB.logFormat]
 
 main ∷ IO ()
 main = do
@@ -225,8 +225,7 @@ helpPreamble = "Merge multiple time-stamped streams into one."
 helpPostamble ∷ String
 helpPostamble = unlines $ concat [
     ["LOG_FORMATs:"]
-  , map (\LogFormat{_formatName = n, _formatDescription = d} → "  " ++ n ++ " : " ++ d)
-        (logFormats ∷ [LogFormat (WarningT [String] String IO) a])
+  , map (\LogFormat{_formatName = n, _formatDescription = d} → "  " ++ n ++ " : " ++ d) logFormats
   , [
       ""
     , "EXAMPLES:"

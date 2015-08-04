@@ -8,3 +8,4 @@ realtest
 *.prof
 *.hp
 web/3rdparty
+*/cabal.sandbox.config

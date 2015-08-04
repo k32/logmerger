@@ -1,64 +1,59 @@
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections, ScopedTypeVariables,
-             NoMonomorphismRestriction #-}
+             NoMonomorphismRestriction, LambdaCase #-}
 module Network.VSGSN.Logs.LinuxRB
        (
          logFormat
        ) where
 
 import Prelude hiding (mapM_, takeWhile)
-import Pipes
+import Pipes.Dissect
 import Data.Traversable
 import qualified Data.Map as M
-import Data.Either (either)
 import Data.Word (Word64, Word32)
 import Data.Time.Clock.POSIX
 import Control.Applicative
 import Control.Monad
-import Control.Monad.State.Strict
+import Control.Monad.Warning
 import Data.Attoparsec.ByteString.Char8 (
-    skipSpace
-  , hexadecimal
+    hexadecimal
   , decimal
-  , isEndOfLine
   , endOfLine
-  , char8
-  , Parser
-  , (<?>)
-  , takeTill
-  , takeWhile
+  , skipSpace
   , string
+  , Parser
+  , match
+  , anyChar
+  , takeTill
   )
-import Data.ByteString.Internal (c2w, w2c)
+import Data.Attoparsec.Combinator
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
 import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
 import Network.VSGSN.Logs.Util
-import Debug.Trace
-import Prelude hiding (takeWhile)
 
-logFormat ∷ (Monad m) ⇒ LogFormat m a
+logFormat ∷ LogFormat
 logFormat = LogFormat {
-    _dissector = \dt fn i → let cons' = Right () <$ i
-                                parseEntries = parse' (rbDissector dt fn) TabulaRasa
-                            in cons' >-> parseEntries
+    _dissector = myDissector
   , _nameRegex = mkRegex "log\\.rb(\\.old)?$"
   , _formatName = "sgsn-mme-linux-rb"
   , _formatDescription = "Ringbuffer of SGSN-MME boards running Linux"
   }
 
-toNextEntry ∷ Parser (B.ByteString, (Word64, Word32))
-toNextEntry = loop ""
-  where rbHead = (,) <$> ("~RB03~[" *> hex')
-                     <*> (hex' <* "]")
-        further t0 t1 = loop $ B.concat [t0, t1]
-        enough t0 t1 = (B.concat [t0, t1],) <$> rbHead
-        loop t0 = do
-          t1 ← takeTill (== '~')
-          enough t0 t1 <|> further t0 t1
-
 type Tags = M.Map Word32 B.ByteString
+
+myDissector ∷ LogDissector
+myDissector dt fn p0 = dissect `evalStateT` p0
+  where dissect = parse getTags >>= \case
+                    Left x → return $ Left [x]
+                    Right tags → do
+                      parse $ manyTill anyChar (lookAhead entryHead)
+                      loop tags
+        loop tags = parse (entry dt fn tags) >>= \case
+                      Left a → return $ Left [a]
+                      Right e → do
+                        yieldD e
+                        loop tags
 
 line s = string s >> endOfLine
 
@@ -67,40 +62,31 @@ hex' = skipSpace *> hexadecimal <* skipSpace
 dec' = skipSpace *> decimal <* skipSpace
 {-# INLINABLE dec' #-}
 
+entryHead ∷ Parser (Int, Word32)
+entryHead = (,) <$> ("~RB03~[" *> hex')
+                <*> (hex' <* "]")
+
+entry ∷ NominalDiffTime 
+      → String 
+      → Tags 
+      → Parser SGSNBasicEntry
+entry dt fn tags = do
+  (d, t) ← entryHead <?> "RB_entry_head"
+  (txt, _) ← match $ manyTill anyChar $ lookAhead (() <$ entryHead <|> endOfInput)
+  let t'' = case M.lookup t tags of
+              Nothing → "???"
+              Just "undefined_tag" → "tag #" ++ show t
+              Just x  → fmap (toEnum . fromIntegral) $ B.unpack x
+  return BasicLogEntry {
+      _basic_date = dt `addUTCTime` posixSecondsToUTCTime (fromIntegral d)
+    , _basic_origin = t'' `OCons` Location fn
+    , _basic_text = txt
+    }
+
 getTags ∷ Parser Tags
 getTags = do
-  line "RB03" <?> "tag header"
+  line "RB03" <?> "Ringbuffer header"
   nTags ← "Dump of" *> dec' <* "tags\n" <?> "tag count"
-  replicateM_ 2 skipAnyLine <?> "tag footer"
-  let tag = (,) <$> hex' <*> (takeTill (=='\n') <* endOfLine) <?> "tag"
-  M.fromList <$> replicateM nTags tag 
-
-data MyState = TabulaRasa
-             | GotTags Tags (Word64, Word32)
-             | Finish
-
-instance Show MyState where
-  show Finish = "Finish"
-  show (GotTags _ _) = "GotTags"
-  show TabulaRasa = "TabulaRasa"
-
-rbDissector ∷ NominalDiffTime → FilePath → MyState → Parser (PResult MyState SGSNBasicEntry ())
-rbDissector _ _ Finish = return $ Exit ()
--- Note the 'snd' below. Basically, we discard some input.
--- TODO: We need some kind of "uncertain" dates to prevent such losses...
-rbDissector _ _ TabulaRasa = Loop <$> (GotTags <$> getTags <*> (snd <$> toNextEntry))
-rbDissector dt fn (GotTags tags (d, t)) = do
-  txt ← (Right <$> toNextEntry) <|> (Left <$> takeWhile (const True))
-  let m = BasicLogEntry {
-          _basic_date = dt `addUTCTime` posixSecondsToUTCTime (fromIntegral d)
-        , _basic_origin = t'' `OCons` Location { _file = fn }
-        , _basic_text = either id fst txt
-        }
-      t'' = case M.lookup t tags of
-             Nothing → "???"
-             Just "undefined_tag" → "tag #" ++ show t
-             Just x  → fmap w2c $ B.unpack x
-      s' = case txt of
-            Left _ → Finish
-            Right (_, (d', t')) → GotTags tags (d', t')
-  return $ Yield s' m
+  replicateM_ 2 skipAnyLine <?> "tags header"
+  let tag = (,) <$> (hex' <?> "tag_id") <*> ((takeTill (=='\n') <* endOfLine) <?> "tag_name") <?> "tag"
+  M.fromList <$> replicateM nTags tag

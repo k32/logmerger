@@ -11,7 +11,6 @@ import Network.VSGSN.Logs.Util
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Warning
-import Debug.Trace
 import System.IO
 import qualified Data.ByteString as BL
 import Data.Attoparsec.ByteString
