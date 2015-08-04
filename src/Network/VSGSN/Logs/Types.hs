@@ -24,7 +24,7 @@ type LogDissector = ∀ m a . (Monad m)
                   ⇒ NominalDiffTime 
                   → FilePath 
                   → Producer P.ByteString m a
-                  → Producer SGSNBasicEntry m (Either [String] ())
+                  → Producer SGSNBasicEntry m (Either String ())
 
 data LogFormat = LogFormat {
     _dissector    ∷ LogDissector

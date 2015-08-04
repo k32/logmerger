@@ -45,15 +45,10 @@ type Tags = M.Map Word32 B.ByteString
 myDissector ∷ LogDissector
 myDissector dt fn p0 = dissect `evalStateT` p0
   where dissect = parse getTags >>= \case
-                    Left x → return $ Left [x]
+                    Left x → return $ Left x
                     Right tags → do
                       parse $ manyTill anyChar (lookAhead entryHead)
-                      loop tags
-        loop tags = parse (entry dt fn tags) >>= \case
-                      Left a → return $ Left [a]
-                      Right e → do
-                        yieldD e
-                        loop tags
+                      tillEnd (entry dt fn tags)
 
 line s = string s >> endOfLine
 

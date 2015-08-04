@@ -2,7 +2,7 @@
 import Test.Framework (defaultMain, testGroup)
 import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
---import Network.VSGSN.Logs.Isp as Isp
+import Network.VSGSN.Logs.Isp as ISP
 import Network.VSGSN.Logs.LinuxRB as RB
 import Control.Applicative
 import Pipes
@@ -15,7 +15,7 @@ import qualified Data.ByteString as B
 import Text.Printf
 import Data.String
 import Data.Time.Clock.POSIX
-import Data.List (sort)
+import Data.List (nub, sort)
 import Data.Function (on)
 import Control.Monad.Identity
 import Data.Time
@@ -23,6 +23,16 @@ import Data.Word (Word8)
 import Text.Format
 import qualified Data.Map as M
 import Data.Monoid
+import Control.Lens (
+    (&)
+  , (%~)
+  , view
+  , over
+  , _1, _2
+  , views
+  , sets
+  , mapped
+  )
 
 {- Utils -}
 byteStringToString ∷ B.ByteString 
@@ -37,7 +47,17 @@ instance Arbitrary EasyMode where
       choose ('a','z')
     , choose ('A', 'Z')
     , choose ('0', '9')
-    , elements "-_:"])
+    , elements "-:!@#$%^&*()_+"])
+    
+instance Arbitrary SGSNBasicEntry where
+  arbitrary = do
+    t ← arbitrary
+    txt ← arbitrary
+    return BasicLogEntry {
+        _basic_date = t
+      , _basic_origin = Location "TestFile"
+      , _basic_text = fromString txt
+      }
 
 instance Arbitrary UTCTime where
   arbitrary = do
@@ -76,22 +96,38 @@ okParser ∷ (Show a, Eq a, Show r)
          → (Producer B.ByteString Identity x → Producer a Identity r)
          → [a]
          → Property
-okParser p c d b = c > 0 ==> counterexample msg (a==b)
+okParser p c d b = (c > 0) ==> counterexample msg (a==b)
   where (r, a) = sink $ d (chunks c p)
         msg = show b ++ "/=" ++ show a ++"\n<PRETTY>\n" ++ byteStringToString p ++"\n</PRETTY>\nPARSER RETURNED: "++show r
 
 {- Tests -}
-prop_RibgbufferParse ∷ (Int, Word, String, [EasyMode], [(UTCTime, Word8, String)]) 
+prop_IspLogParse ∷ (Word, Int, [SGSNBasicEntry])
+                 → Property
+prop_IspLogParse (chunkSize, ltOffset, l) = 
+  let
+    printEntry BasicLogEntry {
+        _basic_date = d
+      , _basic_text = t
+      } = concat [formatTime defaultTimeLocale "%F %T UTC%z" d, ";", byteStringToString t, "\n"] 
+    pprint = fromString $ concat [
+        "Content of isp.log\n==================\n"
+      , l >>= printEntry
+      ]
+    parser = (_dissector ISP.logFormat) (fromIntegral ltOffset) "TestFile"
+    okText = B.notElem (fromIntegral $ fromEnum '\n') . _basic_text
+  in
+    all okText l ==> okParser pprint chunkSize parser l
+
+prop_RibgbufferParse ∷ (Int, Word, String, [EasyMode], [(Word8, SGSNBasicEntry)]) 
                      → Property
 prop_RibgbufferParse (ltOffset, chunkSize, remains, tags0, l) = 
   let
     tags = map toString tags0
     n_tags = length tags
-    entries = [BasicLogEntry {
-                 _basic_date = d
-               , _basic_origin = tags !! t' `OCons` Location "TestFile"
-               , _basic_text = fromString txt
-               } | (d, t, txt) ← l, let t' = (fromIntegral t) `rem` n_tags]
+    appendTag t o = t'' `OCons` o
+      where t'' = tags !! t'
+            t' = (fromIntegral t) `rem` n_tags
+    entries = map (\(t, e) → e & basic_origin %~ appendTag t) l
     tags' = M.fromList $ zip tags [0 ∷ Int ..]
     formatEntry BasicLogEntry{
                     _basic_date = d
@@ -110,8 +146,7 @@ prop_RibgbufferParse (ltOffset, chunkSize, remains, tags0, l) =
       ]
     parser = (_dissector RB.logFormat) (fromIntegral ltOffset) "TestFile"
   in
-    (n_tags > 0 && n_tags < 256) ==>
-    (all (not . null) tags) ==>
+    (n_tags > 0 && n_tags < 256) && (length (nub tags) == length tags) && (all (not . null) tags) ==>
     okParser pprint chunkSize parser entries
   
 --prop_ispLogParse l = parserTest pprintIsp "TestPath" Isp.logFormat l
@@ -124,15 +159,11 @@ prop_nEntitiesConservation l = n === n'
         (_, l') = sink $ interleave s
         s = map each l
 
-prop_interleaveSorting ∷ [(String, [(UTCTime, String)])] 
+prop_interleaveSorting ∷ [(String, [SGSNBasicEntry])] 
                        → Bool
 prop_interleaveSorting l = isSorted l'
   where (_, l') = sink $ interleave $ map mkLogEntries l
-        mkLogEntries (o, s) = each $ sort [BasicLogEntry {
-                                             _basic_date = d
-                                           , _basic_origin = Location o
-                                           , _basic_text = fromString t
-                                           } | (d, t) ← s] ∷ Producer SGSNBasicEntry Identity ()
+        mkLogEntries (o, s) = each $ sort s
 
 prop_mergeSameContentConservation ∷ [(String, UTCTime, [String])] 
                                   → Property
@@ -162,8 +193,8 @@ merging = testGroup "Log merging" [
           ]
 
 parsing = testGroup "Log parsing" [
-            --testProperty "isp.log parsing" prop_ispLogParse
-            testProperty "Linux ringbuffer parsing" prop_RibgbufferParse
+            testProperty "isp.log parsing" prop_IspLogParse
+          , testProperty "Linux ringbuffer parsing" prop_RibgbufferParse
           ]
 
 main = defaultMain [

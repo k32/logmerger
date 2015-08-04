@@ -7,22 +7,27 @@ module Network.VSGSN.Logs.Isp
 
 import Control.Applicative
 import Control.Monad
-import Data.Attoparsec.ByteString
 import Data.Attoparsec.ByteString.Char8 (
     skipSpace
   , decimal
   , signed
+  , takeTill
   , isEndOfLine
   , endOfLine
-  , char8)
+  , endOfInput
+  , char8
+  , (<?>)
+  , Parser
+  )
 import qualified Data.ByteString.Lazy.Internal as B
 import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
 import Network.VSGSN.Logs.Util
 import Pipes
+import Pipes.Dissect
 import Prelude hiding (takeWhile)
 
-logFormat ∷ (Monad m) ⇒ LogFormat m a
+logFormat ∷ LogFormat
 logFormat = LogFormat {
     _dissector = ispDissector
   , _nameRegex = mkRegex "isp.log$"
@@ -30,20 +35,26 @@ logFormat = LogFormat {
   , _formatDescription = "Isp log of SGSN-MME nodes"
   }
 
-ispDissector ∷ NominalDiffTime → FilePath → MyState → Parser (PResult MyState SGSNBasicEntry ())
-ispDissector _  = skipAnyLine >> skipAnyLine >> return (Loop Normal)
-ispDissector file Normal = do
-  day ← fromGregorian <$> decimal <*> ("-" *> decimal) <*> ("-" *> decimal) <* skipSpace
-  (hh, mm, ss) ← (,,) <$> decimal <*> (":" *> decimal) <*> (":" *> decimal) <* skipSpace
+logEntry ∷ String 
+         → Parser SGSNBasicEntry
+logEntry fn = do
+  day ← yymmdd <* skipSpace
+  time ← hhmmss <* skipSpace
   off ← "UTC" *> signed decimal <* (skipSpace >> ";") -- TODO: do something with off
-  txt ← takeTill isEndOfLine <* endOfLine
-  return $ Yield Normal $ BasicLogEntry {
-      _basic_origin   = Location {
-           _file = file
-         }
-    , _basic_date = UTCTime {
-          utctDay     = day
-        , utctDayTime = secondsToDiffTime $ (hh * 3600) + (mm * 60) + ss
-        }
-    , _basic_text = txt
-    }
+  txt ← takeTill (=='\n') <* (endOfLine <|> endOfInput)
+  return BasicLogEntry {
+        _basic_origin   = Location {
+             _file = fn
+           }
+      , _basic_date = UTCTime {
+            utctDay     = day
+          , utctDayTime = time
+          }
+      , _basic_text = txt
+      }
+
+ispDissector ∷ LogDissector
+ispDissector _ fn p0 = diss `evalStateT` p0 
+  where diss = do
+          parse ("Content of isp.log\n==================\n" <?> "isp.log header")
+          tillEnd $ logEntry fn 

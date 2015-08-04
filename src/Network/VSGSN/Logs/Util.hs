@@ -6,6 +6,8 @@ module Network.VSGSN.Logs.Util (
  , openFile'
  , follow
  , (<!)
+ , yymmdd
+ , hhmmss
  ) where
 
 import Pipes
@@ -14,7 +16,14 @@ import qualified Pipes.ByteString as P
 import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
 import Data.Attoparsec.ByteString hiding (try)
-import Data.Attoparsec.ByteString.Char8 (isEndOfLine, endOfLine, anyChar)
+import Data.Attoparsec.ByteString.Char8 (
+    isEndOfLine
+  , endOfLine
+  , anyChar
+  , decimal
+  , skipSpace
+  , Parser
+  )
 import qualified Data.ByteString as B
 import Control.Applicative
 import Control.Monad.Warning
@@ -23,12 +32,27 @@ import Control.Exception
 import Control.Concurrent (threadDelay)
 import Data.IORef
 import Data.List (intercalate)
+import Data.Time (
+    fromGregorian
+  , secondsToDiffTime
+  , Day
+  )
+
+yymmdd ∷ Parser Day
+yymmdd = fromGregorian <$> decimal <*> ("-" *> decimal) <*> ("-" *> decimal) <* skipSpace <?> "date"
+
+hhmmss ∷ Parser DiffTime
+hhmmss = do
+  hh ← decimal <* ":" <?> "hours"
+  mm ← decimal <* ":" <?> "minutes"
+  ss ← decimal <?> "seconds"
+  return $ secondsToDiffTime $ (hh * 3600) + (mm * 60) + ss
 
 type Fin = IORef [IO ()]
 
 follow ∷ MonadIO m
        ⇒ Int 
-       → m () 
+       → m ()
        → m r
 follow n m = forever $ do
                 m

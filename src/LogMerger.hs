@@ -13,7 +13,7 @@ import Network.VSGSN.Logs.Util
 import Network.VSGSN.Logs.Types
 import Network.VSGSN.PrettyPrint
 import Network.VSGSN.MergeSame
--- import qualified Network.VSGSN.Logs.Isp as ISP
+import qualified Network.VSGSN.Logs.Isp as ISP
 -- import qualified Network.VSGSN.Logs.CLI as CLI
 -- import qualified Network.VSGSN.Logs.FMAlarm as FMA
 import qualified Network.VSGSN.Logs.LinuxRB as LinRB
@@ -142,7 +142,7 @@ logFormat fmt fname =
 
 -- TODO: Refactor me
 openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m , MonadReader GlobalVars m) ⇒
-          NominalDiffTime → Input → m (Producer SGSNBasicEntry m (Either [String] ()))
+          NominalDiffTime → Input → m (Producer SGSNBasicEntry m (Either String ()))
 openLog dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
   LogFormat {_dissector=diss} ← logFormat fmt fn
   follow' ← view (cfg . g_follow) >>= \case
@@ -205,7 +205,7 @@ main' = do
           >-> ("Broken sink pipe." <! sink)
 
 logFormats ∷ [LogFormat]
-logFormats = [{- ISP.logFormat, CLI.logFormat, -} LinRB.logFormat]
+logFormats = [ISP.logFormat, {- CLI.logFormat, -} LinRB.logFormat]
 
 main ∷ IO ()
 main = do

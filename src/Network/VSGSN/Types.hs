@@ -1,7 +1,9 @@
 {-# LANGUAGE UnicodeSyntax, TemplateHaskell, DeriveDataTypeable, StandaloneDeriving #-}
 module Network.VSGSN.Types (
    BasicLogEntry(..)
- -- , Event(..)
+ , basic_origin
+ , basic_date
+ , basic_text
  , Origin(..)
  , DateTime
  , module Data.Time
@@ -15,6 +17,7 @@ import Data.ByteString
 import Data.Data
 import Data.Typeable
 import Data.ByteString.Internal (c2w, w2c)
+import Control.Lens
 
 type DateTime = UTCTime
 
@@ -36,6 +39,7 @@ data BasicLogEntry o =
   , _basic_origin ∷ Origin o
   , _basic_text   ∷ B.ByteString
   } deriving (Eq, Data, Typeable)
+makeLenses ''BasicLogEntry
 
 instance (Eq o) ⇒ Ord (BasicLogEntry o) where
   compare a b = compare (_basic_date a) (_basic_date b)
