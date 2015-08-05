@@ -1,13 +1,13 @@
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections, GADTs, NoMonomorphismRestriction #-}
-module Network.VSGSN.TzInfo
+module Text.LogMerger.TzInfo
        (
          readTzInfo
        ) where
 
 import Data.Time
 import Data.Time.Clock.POSIX
-import Network.VSGSN.Logs.Util
+import Text.LogMerger.Logs.Util
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Warning

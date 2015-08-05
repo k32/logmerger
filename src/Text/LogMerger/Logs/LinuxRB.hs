@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections, ScopedTypeVariables,
              NoMonomorphismRestriction, LambdaCase #-}
-module Network.VSGSN.Logs.LinuxRB
+module Text.LogMerger.Logs.LinuxRB
        (
          logFormat
        ) where
@@ -28,9 +28,9 @@ import Data.Attoparsec.ByteString.Char8 (
   )
 import Data.Attoparsec.Combinator
 import qualified Data.ByteString as B
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
-import Network.VSGSN.Logs.Util
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
+import Text.LogMerger.Logs.Util
 
 logFormat ∷ LogFormat
 logFormat = LogFormat {

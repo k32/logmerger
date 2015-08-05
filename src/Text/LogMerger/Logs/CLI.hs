@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections, GADTs #-}
-module Network.VSGSN.Logs.CLI (
+module Text.LogMerger.Logs.CLI (
    logFormat
  ) where
 
@@ -14,9 +14,9 @@ import Data.Attoparsec.ByteString.Char8 (
   , takeTill
   )
 import qualified Data.ByteString.Lazy.Internal as B
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
-import Network.VSGSN.Logs.Util
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
+import Text.LogMerger.Logs.Util
 import Pipes
 import Pipes.Dissect
 import Prelude hiding (takeWhile)

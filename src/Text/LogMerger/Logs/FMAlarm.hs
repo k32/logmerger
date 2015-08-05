@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections #-}
-module Network.VSGSN.Logs.FMAlarm
+module Text.LogMerger.Logs.FMAlarm
        (
          logFormat
        ) where
@@ -10,9 +10,9 @@ import Control.Monad
 import Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Internal as B
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
-import Network.VSGSN.Logs.Util
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
+import Text.LogMerger.Logs.Util
 import Prelude hiding (takeWhile)
 
 logFormat ∷ (Monad m) ⇒ LogFormat m a

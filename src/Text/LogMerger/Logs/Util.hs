@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections, GADTs #-}
 
-module Network.VSGSN.Logs.Util (
+module Text.LogMerger.Logs.Util (
    skipAnyLine
  , openFile'
  , follow
@@ -13,8 +13,8 @@ module Network.VSGSN.Logs.Util (
 import Pipes
 import Pipes.Dissect
 import qualified Pipes.ByteString as P
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
 import Data.Attoparsec.ByteString hiding (try)
 import Data.Attoparsec.ByteString.Char8 (
     isEndOfLine
@@ -54,9 +54,7 @@ follow ∷ MonadIO m
        ⇒ Int 
        → m ()
        → m r
-follow n m = forever $ do
-                m
-                liftIO $ threadDelay n
+follow n m = forever $ m >> (liftIO $ threadDelay n)
 
 -- | Open handle in Warning monad
 openFile' ∷ (MonadWarning [String] String m, MonadIO m) 

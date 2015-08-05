@@ -1,6 +1,6 @@
 {-# LANGUAGE UnicodeSyntax, OverloadedStrings, LambdaCase, FlexibleContexts,
              NoMonomorphismRestriction #-}
-module Network.VSGSN.PrettyPrint (
+module Text.LogMerger.PrettyPrint (
     defaultHeaderFormat
   , defaultLineFormat
   , makeLogEntryPP
@@ -14,8 +14,8 @@ import Text.Format
 import Control.Monad.Warning
 import qualified Data.ByteString as B
 import Data.ByteString.Builder
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
 
 defaultHeaderFormat, defaultLineFormat ∷ String
 defaultHeaderFormat = "\n~~~ ${YY}-${MM}-${DD} ${hh}:${mm}:${ss} (${o}) ~~~"

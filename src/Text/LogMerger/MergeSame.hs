@@ -1,13 +1,13 @@
 {-# LANGUAGE UnicodeSyntax #-}
-module Network.VSGSN.MergeSame (
+module Text.LogMerger.MergeSame (
     mergeSameOrigin
   ) where
 
 import Prelude hiding (mapM_)
 import Pipes
 import Data.ByteString as B
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
 import Data.Foldable
 -- import Control.Monad.State
 import qualified Data.Map as M

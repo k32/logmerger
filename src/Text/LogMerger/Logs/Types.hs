@@ -1,5 +1,5 @@
 {-# LANGUAGE UnicodeSyntax, RankNTypes #-}
-module Network.VSGSN.Logs.Types (
+module Text.LogMerger.Logs.Types (
     LogFormat(..)
   , LogDissector
   , Origin
@@ -12,7 +12,7 @@ import Pipes
 import Data.Time (NominalDiffTime)
 import qualified Pipes.ByteString as P
 import Text.Regex
-import Network.VSGSN.Types
+import Text.LogMerger.Types
 import Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Lazy.Internal as B
 

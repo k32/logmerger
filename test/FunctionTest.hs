@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings, UnicodeSyntax, FlexibleInstances, FlexibleContexts, LambdaCase #-}
 import Test.Framework (defaultMain, testGroup)
-import Network.VSGSN.Types
-import Network.VSGSN.Logs.Types
-import Network.VSGSN.Logs.Isp as ISP
-import Network.VSGSN.Logs.CLI as CLI
-import Network.VSGSN.Logs.LinuxRB as RB
+import Text.LogMerger.Types
+import Text.LogMerger.Logs.Types
+import Text.LogMerger.Logs.Isp as ISP
+import Text.LogMerger.Logs.CLI as CLI
+import Text.LogMerger.Logs.LinuxRB as RB
 import Control.Applicative
 import Pipes
 import Pipes.Interleave
-import Network.VSGSN.MergeSame
+import Text.LogMerger.MergeSame
 import qualified Pipes.ByteString as P
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck

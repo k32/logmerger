@@ -1,5 +1,5 @@
 {-# LANGUAGE UnicodeSyntax, TemplateHaskell, DeriveDataTypeable, StandaloneDeriving #-}
-module Network.VSGSN.Types (
+module Text.LogMerger.Types (
    BasicLogEntry(..)
  , basic_origin
  , basic_date

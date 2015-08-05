@@ -7,16 +7,16 @@ import qualified Pipes.ByteString as P
 import System.IO
 import Text.CLI
 import qualified Text.Format as Fmt
-import Network.VSGSN.Types
-import Network.VSGSN.TzInfo
-import Network.VSGSN.Logs.Util
-import Network.VSGSN.Logs.Types
-import Network.VSGSN.PrettyPrint
-import Network.VSGSN.MergeSame
-import qualified Network.VSGSN.Logs.Isp as ISP
-import qualified Network.VSGSN.Logs.CLI as CLI
--- import qualified Network.VSGSN.Logs.FMAlarm as FMA
-import qualified Network.VSGSN.Logs.LinuxRB as LinRB
+import Text.LogMerger.Types
+import Text.LogMerger.TzInfo
+import Text.LogMerger.Logs.Util
+import Text.LogMerger.Logs.Types
+import Text.LogMerger.PrettyPrint
+import Text.LogMerger.MergeSame
+import qualified Text.LogMerger.Logs.Isp as ISP
+import qualified Text.LogMerger.Logs.CLI as CLI
+-- import qualified Text.LogMerger.Logs.FMAlarm as FMA
+import qualified Text.LogMerger.Logs.LinuxRB as LinRB
 import Control.Monad
 import Control.Monad.Warning
 import Control.Applicative
