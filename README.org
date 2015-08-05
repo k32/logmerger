@@ -1,4 +1,0 @@
-#+TITLE: VSGSN 
-
-* Summary
-Merge and view log files
