@@ -14,7 +14,7 @@ flag WebUI
 executable LogMerger
   main-is:             LogMerger.hs
   other-extensions:    DeriveDataTypeable, UnicodeSyntax, OverloadedStrings, FlexibleContexts, GADTs, Rank2Types, TemplateHaskell, BangPatterns, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, UndecidableInstances, StandaloneDeriving, TupleSections, NoMonomorphismRestriction, ScopedTypeVariables, KindSignatures
-  build-depends:       base >=4.8 && <4.9
+  build-depends:       base >=4.7 && <4.9
                      , pipes >=4.1 && <4.2
                      , bytestring >=0.10 && <0.11
                      , pipes-bytestring >=2.1 && <2.2
