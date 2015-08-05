@@ -3,6 +3,7 @@ import Test.Framework (defaultMain, testGroup)
 import Network.VSGSN.Types
 import Network.VSGSN.Logs.Types
 import Network.VSGSN.Logs.Isp as ISP
+import Network.VSGSN.Logs.CLI as CLI
 import Network.VSGSN.Logs.LinuxRB as RB
 import Control.Applicative
 import Pipes
@@ -100,7 +101,23 @@ okParser p c d b = (c > 0) ==> counterexample msg (a==b)
   where (r, a) = sink $ d (chunks c p)
         msg = show b ++ "/=" ++ show a ++"\n<PRETTY>\n" ++ byteStringToString p ++"\n</PRETTY>\nPARSER RETURNED: "++show r
 
+isOneLiner ∷ SGSNBasicEntry → Bool
+isOneLiner = B.notElem (fromIntegral $ fromEnum '\n') . _basic_text
+
 {- Tests -}
+prop_CLILogParse ∷ (Word, Int, [SGSNBasicEntry])
+                 → Property
+prop_CLILogParse (chunkSize, ltOffset, l) = 
+  let
+    printEntry BasicLogEntry {
+        _basic_date = d
+      , _basic_text = t
+      } = concat [formatTime defaultTimeLocale "%F %T" d, ",", byteStringToString t, "\n"] 
+    pprint = fromString $ l >>= printEntry
+    parser = (_dissector CLI.logFormat) (fromIntegral ltOffset) "TestFile"
+  in
+    all isOneLiner l ==> okParser pprint chunkSize parser l
+
 prop_IspLogParse ∷ (Word, Int, [SGSNBasicEntry])
                  → Property
 prop_IspLogParse (chunkSize, ltOffset, l) = 
@@ -114,9 +131,8 @@ prop_IspLogParse (chunkSize, ltOffset, l) =
       , l >>= printEntry
       ]
     parser = (_dissector ISP.logFormat) (fromIntegral ltOffset) "TestFile"
-    okText = B.notElem (fromIntegral $ fromEnum '\n') . _basic_text
   in
-    all okText l ==> okParser pprint chunkSize parser l
+    all isOneLiner l ==> okParser pprint chunkSize parser l
 
 prop_RibgbufferParse ∷ (Int, Word, String, [EasyMode], [(Word8, SGSNBasicEntry)]) 
                      → Property
@@ -193,8 +209,9 @@ merging = testGroup "Log merging" [
           ]
 
 parsing = testGroup "Log parsing" [
-            testProperty "isp.log parsing" prop_IspLogParse
-          , testProperty "Linux ringbuffer parsing" prop_RibgbufferParse
+            testProperty "Basic isp.log parsing" prop_IspLogParse
+          , testProperty "Basic Linux ringbuffer parsing" prop_RibgbufferParse
+          , testProperty "Basic CLI.log parsing" prop_CLILogParse
           ]
 
 main = defaultMain [

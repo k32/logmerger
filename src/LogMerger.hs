@@ -14,7 +14,7 @@ import Network.VSGSN.Logs.Types
 import Network.VSGSN.PrettyPrint
 import Network.VSGSN.MergeSame
 import qualified Network.VSGSN.Logs.Isp as ISP
--- import qualified Network.VSGSN.Logs.CLI as CLI
+import qualified Network.VSGSN.Logs.CLI as CLI
 -- import qualified Network.VSGSN.Logs.FMAlarm as FMA
 import qualified Network.VSGSN.Logs.LinuxRB as LinRB
 import Control.Monad
@@ -205,7 +205,7 @@ main' = do
           >-> ("Broken sink pipe." <! sink)
 
 logFormats ∷ [LogFormat]
-logFormats = [ISP.logFormat, {- CLI.logFormat, -} LinRB.logFormat]
+logFormats = [ISP.logFormat, CLI.logFormat, LinRB.logFormat]
 
 main ∷ IO ()
 main = do
