@@ -1,3 +1,3 @@
 language: haskell
-os:
-  - linux
+ghc: 7.8
+os: linux
