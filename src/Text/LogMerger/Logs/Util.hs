@@ -1,3 +1,4 @@
+{- Odds and ends. TODO: Refactor this module -}
 {-# LANGUAGE DeriveDataTypeable, UnicodeSyntax, OverloadedStrings,
              FlexibleContexts, TupleSections, GADTs #-}
 
@@ -38,9 +39,11 @@ import Data.Time (
   , Day
   )
 
+-- | Read date in form "yyyy-mm-dd"
 yymmdd ∷ Parser Day
 yymmdd = fromGregorian <$> decimal <*> ("-" *> decimal) <*> ("-" *> decimal) <* skipSpace <?> "date"
 
+-- | Read time in form "hh:mm:ss"
 hhmmss ∷ Parser DiffTime
 hhmmss = do
   hh ← decimal <* ":" <?> "hours"
@@ -50,6 +53,7 @@ hhmmss = do
 
 type Fin = IORef [IO ()]
 
+-- | Make a 'Producer' mimicing "tail -f" behavior 
 follow ∷ MonadIO m
        ⇒ Int 
        → m ()
@@ -74,5 +78,6 @@ openFile' fn fm = do
      → t m b
 e <! p = p >> lift (throwW e)
 
+-- | Attoparsec parser skipping any line
 skipAnyLine ∷ Parser ()
 skipAnyLine = takeTill isEndOfLine >> endOfLine
