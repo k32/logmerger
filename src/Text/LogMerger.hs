@@ -11,6 +11,7 @@ module Text.LogMerger (
 
 import Pipes
 import Pipes.Interleave
+import qualified Pipes.ByteString as P
 import Text.CLI
 import qualified Text.Format as Fmt
 import Text.LogMerger.Types
@@ -31,7 +32,6 @@ import Data.Maybe (isJust)
 import Data.Function (on)
 import Data.Either (lefts, rights)
 import qualified Data.ByteString as B
-import qualified Pipes.ByteString as P
 import System.IO
 
 data Input =
@@ -232,7 +232,8 @@ cliMergerMain cfg0 logFormats = do
 helpPreamble ∷ String
 helpPreamble = "Merge multiple time-stamped streams into one."
 
-helpPostamble ∷ [LogFormat] → String
+helpPostamble ∷ [LogFormat] 
+              → String
 helpPostamble logFormats = unlines $ concat [
     ["LOG_FORMATs:"]
   , map (\LogFormat{_formatName = n, _formatDescription = d} → "  " ++ n ++ " : " ++ d) logFormats

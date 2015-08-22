@@ -1,4 +1,6 @@
 *~
+**#
+**/.#*
 dist
 .cabal-sandbox
 *.hi
@@ -8,4 +10,4 @@ realtest
 *.prof
 *.hp
 web/3rdparty
-*/cabal.sandbox.config
+**/cabal.sandbox.config

@@ -1,5 +1,4 @@
-{-# LANGUAGE UnicodeSyntax, OverloadedStrings, FlexibleContexts, 
-             GADTs, Rank2Types, TemplateHaskell, LambdaCase #-}
+{-# LANGUAGE UnicodeSyntax #-}
 import Text.LogMerger
 import qualified Text.LogMerger.Logs.Isp as ISP
 import qualified Text.LogMerger.Logs.CLI as CLI

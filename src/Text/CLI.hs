@@ -1,3 +1,5 @@
+-- Very stupid and simple CLI parser.
+-- It is intended to deal with 
 {-# LANGUAGE UnicodeSyntax, Rank2Types, MultiParamTypeClasses, GADTs, KindSignatures #-}
 module Text.CLI (
     parseCli
@@ -11,21 +13,36 @@ import Control.Monad
 import Data.Maybe (catMaybes)
 import Data.List
 import qualified Data.Set as S
+import Control.Lens
+import Data.Monoid
 
+-- | Structure representing a CLI parameter
 data CliParam ∷ * → * where
     CliParam ∷ {
-      _long ∷ String
-    , _short ∷ Maybe Char
-    , _descr ∷ String
-    , _setter ∷ CliSetter a
+      _long ∷ String            -- ^ Long name of a parameter
+    , _short ∷ Maybe Char       -- ^ Shortcut for the parameter
+    , _descr ∷ String           -- ^ Parameter description
+    , _setter ∷ CliSetter a     -- ^ Setter
     } → CliParam a
 
+-- | Structure containing all parameters accepted by an application
 data CliDescr a b =
     CliDescr {
-      _globalAttrs ∷ [CliParam (a b)]
-    , _perFileAttrs ∷ [CliParam b]
+      _globalAttrs ∷ [CliParam (a b)] -- ^ 
+    , _perFileAttrs ∷ [CliParam b]    -- ^ 
     }
-    
+
+instance Monoid (CliDescr a b) where
+  mempty = CliDescr {
+      _globalAttrs = []
+    , _perFileAttrs = []
+    }
+  
+  mappend a b = CliDescr {
+      _globalAttrs = _globalAttrs a `mappend` _globalAttrs b
+    , _perFileAttrs = _perFileAttrs a `mappend` _perFileAttrs b
+    }
+
 data CliSetter a = 
   CliParameter {
     _cliParSetter ∷ String → a → a
@@ -35,6 +52,7 @@ data CliSetter a =
     _cliFlagSetter ∷ Bool → a → a
   }
 
+-- | Expand shortcuts
 expandCli ∷ [String] → [String]
 expandCli = (>>= f)
   where f x@(h:t) = case h of
@@ -46,13 +64,13 @@ expandCli = (>>= f)
 
 checkDescr ∷ CliDescr a b → S.Set Char
 checkDescr CliDescr{_globalAttrs = g, _perFileAttrs = p} = 
-    checkN g `seq` checkN p `seq` checkDubs g `seq` checkDubs p 
+    checkN g `seq` checkN p `seq` checkDups g `seq` checkDups p 
   where
     checkN = foldl' isN () . catMaybes . map _short
     isN _ a | a == 'n' = error "Using 'n' is not allowed for short flags."
             | True = ()
             
-    checkDubs l = foldl' dup S.empty (map _long l) `seq`
+    checkDups l = foldl' dup S.empty (map _long l) `seq`
               foldl' dup S.empty (catMaybes $ map _short l)
     dup ∷ (Show a, Ord a) ⇒ S.Set a → a → S.Set a
     dup s a | S.member a s = error $ "Duplicate flag: " ++ show a
@@ -85,7 +103,6 @@ matches p (a, l) = case match p a l of
                      Just (a', l') → matches p (a', l')
                      Nothing → (a, l)
 
--- Very stupid and simple CLI parser
 parseCli ∷ String -- ^ Help message peamble
          → String -- ^ Help message postamble
          → a b    -- ^ Global defaults

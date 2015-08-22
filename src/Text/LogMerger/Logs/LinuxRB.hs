@@ -27,6 +27,7 @@ import Data.Attoparsec.ByteString.Char8 (
   , takeTill
   )
 import Data.Attoparsec.Combinator
+import Data.Attoparsec.Combinator.Skip
 import qualified Data.ByteString as B
 import Text.LogMerger.Types
 import Text.LogMerger.Logs.Types
@@ -67,7 +68,7 @@ entry ∷ NominalDiffTime
       → Parser SGSNBasicEntry
 entry dt fn tags = do
   (d, t) ← entryHead <?> "RB_entry_head"
-  (txt, _) ← match $ manyTill anyChar $ lookAhead (() <$ entryHead <|> endOfInput)
+  txt ← matchManyTill anyChar (() <$ entryHead <|> endOfInput)
   let t'' = case M.lookup t tags of
               Nothing → "???"
               Just "undefined_tag" → "tag #" ++ show t
@@ -83,5 +84,6 @@ getTags = do
   line "RB03" <?> "Ringbuffer header"
   nTags ← "Dump of" *> dec' <* "tags\n" <?> "tag count"
   replicateM_ 2 skipAnyLine <?> "tags header"
-  let tag = (,) <$> (hex' <?> "tag_id") <*> ((takeTill (=='\n') <* endOfLine) <?> "tag_name") <?> "tag"
+  let tag = (,) <$> (hex' <?> "tag_id")
+                <*> ((takeTill (=='\n') <* endOfLine) <?> "tag_name") <?> "tag"
   M.fromList <$> replicateM nTags tag
