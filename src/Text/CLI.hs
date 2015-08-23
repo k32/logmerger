@@ -1,11 +1,14 @@
 -- Very stupid and simple CLI parser.
--- It is intended to deal with 
-{-# LANGUAGE UnicodeSyntax, Rank2Types, MultiParamTypeClasses, GADTs, KindSignatures #-}
+{-# LANGUAGE UnicodeSyntax, Rank2Types, MultiParamTypeClasses, 
+             GADTs, KindSignatures, FlexibleInstances, TemplateHaskell #-}
 module Text.CLI (
     parseCli
+  , MyS(..)
   , CliDescr(..)
   , CliParam(..)
   , CliSetter(..)
+  , setter
+  , (.→)
   ) where
 
 import System.Environment
@@ -14,7 +17,40 @@ import Data.Maybe (catMaybes)
 import Data.List
 import qualified Data.Set as S
 import Control.Lens
+import Control.Lens.TH
 import Data.Monoid
+
+-- class CliParamSetter a where
+--   cliParamSetter ∷ a s → MySetter 
+
+
+-- instance CliParamSetter MySetter where
+--   cliParamSetter = id
+
+-- instance (a s ~ ASetter' s String) ⇒ CliParamSetter a where
+--   cliParamSetter s = s :$ id
+ 
+data CliSetter ∷ * → * where
+  CliParameter ∷ {
+    _cliParSetter ∷ MyS a
+  , _cliParOperand ∷ String
+  } → CliSetter a
+  CliFlag ∷ {
+    _cliFlagSetter ∷ ASetter' a Bool
+  } → CliSetter a
+
+data MyS ∷ * → * where
+  (:$) ∷ {
+     _mysetter ∷ ASetter' s a
+   , _myparser ∷ (String → a)
+   } → MyS s
+
+(.→) ∷ CliSetter a → ASetter' b a → CliSetter b
+a@CliParameter{_cliParSetter = sa :$ sb} .→ b =
+   a{
+     _cliParSetter = (b . sa) :$ sb
+   }
+CliFlag{_cliFlagSetter = a} .→ b = CliFlag{_cliFlagSetter = b . a}
 
 -- | Structure representing a CLI parameter
 data CliParam ∷ * → * where
@@ -24,12 +60,13 @@ data CliParam ∷ * → * where
     , _descr ∷ String           -- ^ Parameter description
     , _setter ∷ CliSetter a     -- ^ Setter
     } → CliParam a
+makeLenses ''CliParam
 
 -- | Structure containing all parameters accepted by an application
 data CliDescr a b =
     CliDescr {
-      _globalAttrs ∷ [CliParam (a b)] -- ^ 
-    , _perFileAttrs ∷ [CliParam b]    -- ^ 
+      _globalAttrs ∷ [CliParam (a b)] -- ^ Global CLI attributes
+    , _perFileAttrs ∷ [CliParam b]    -- ^ Per-file CLI attributes
     }
 
 instance Monoid (CliDescr a b) where
@@ -43,15 +80,12 @@ instance Monoid (CliDescr a b) where
     , _perFileAttrs = _perFileAttrs a `mappend` _perFileAttrs b
     }
 
-data CliSetter a = 
-  CliParameter {
-    _cliParSetter ∷ String → a → a
-  , _cliParOperand ∷ String
-  } |
-  CliFlag {
-    _cliFlagSetter ∷ Bool → a → a
-  }
-
+-- cliParameter ∷ (CliParamSetter s)
+--              ⇒ s 
+--              → String
+--              → CliSetter a
+-- cliParameter a = CliParameter (cliParamSetter a)
+  
 -- | Expand shortcuts
 expandCli ∷ [String] → [String]
 expandCli = (>>= f)
@@ -90,11 +124,11 @@ expandLong n = Just . (r ++)
 flagEq n f s l = (elem f) $ catMaybes [expandLong n l, expandShort n s] 
 
 match ∷ [CliParam a] → a → [String] → Maybe (a, [String])
-match (CliParam{_short = s, _long = l, _setter = (CliParameter t _)}:_) a (f:v:r) 
-  | flagEq True f s l = Just (t v a, r)
+match (CliParam{_short = s, _long = l, _setter = (CliParameter (t:$g) _)}:_) a (f:v:r) 
+  | flagEq True f s l = Just (set t (g v) a, r)
 match (CliParam{_short = s, _long = l, _setter = CliFlag t}:_) a (f:r) 
-  | flagEq True f s l = Just (t True a, r)
-  | flagEq False f s l = Just (t False a, r)
+  | flagEq True f s l = Just (set t True a, r)
+  | flagEq False f s l = Just (set t False a, r)
 match (_:p) a r = match p a r 
 match [] a r = Nothing
 

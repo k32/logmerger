@@ -22,7 +22,6 @@ import Data.Attoparsec.ByteString.Char8 (
   , skipSpace
   , string
   , Parser
-  , match
   , anyChar
   , takeTill
   )
@@ -63,8 +62,8 @@ entryHead = (,) <$> ("~RB03~[" *> hex')
                 <*> (hex' <* "]")
 
 entry ∷ NominalDiffTime 
-      → String 
-      → Tags 
+      → String
+      → Tags
       → Parser SGSNBasicEntry
 entry dt fn tags = do
   (d, t) ← entryHead <?> "RB_entry_head"

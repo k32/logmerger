@@ -1,10 +1,12 @@
-{-# LANGUAGE UnicodeSyntax, TemplateHaskell, LambdaCase, FlexibleContexts #-}
+{-# LANGUAGE UnicodeSyntax, TemplateHaskell, LambdaCase, FlexibleContexts,
+             RankNTypes #-}
 module Text.LogMerger (
     module Pipes
   , module Text.LogMerger.Types
   , module Text.LogMerger.Logs.Types
   , Input(..)
   , LogMerger(..)
+  , LogMergerCfg
   , cliDefaults
   , cliMergerMain
   ) where
@@ -59,42 +61,46 @@ data LogMerger i =
   } deriving (Show)
 makeLenses ''LogMerger
 
-cliAttr ∷ CliDescr LogMerger Input
-cliAttr = CliDescr {
-    _globalAttrs = [
+type LogMergerCfg = LogMerger Input
+
+cliAttr ∷ ASetter' (s0 Input) (LogMerger Input)
+        → CliDescr s0 Input
+cliAttr s0 = CliDescr {
+    _globalAttrs = process [
       CliParam "output" (Just 'o') "Output file ('-' for stdout)" $ 
-        CliParameter (set output) "FILE"
+        CliParameter (output :$ id) "FILE"
     , CliParam "tzinfo" (Just 'i') "Path to an SGSN-MME tzinfo file" $ 
-        CliParameter (g_tzInfo =§ Just) "FILE"
+        CliParameter (g_tzInfo :$ Just) "FILE"
     , CliParam "timezone" (Just 'z') "Timezone (UTC ± minutes)" $ 
-        CliParameter (g_timeZone =§ (Just . fromIntegral . (*60) . read)) "TIME"
+        CliParameter (g_timeZone :$ (Just . fromIntegral . (*60) . read)) "TIME"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $ 
-        CliFlag (set g_mergeSame)
+        CliFlag g_mergeSame
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
-        CliFlag (set g_follow)
+        CliFlag g_follow
     , CliParam "header" Nothing "Header format of entries" $ 
-        CliParameter (set headerFormat)"FORMAT"
+        CliParameter (headerFormat :$ id)"FORMAT"
     , CliParam "line" Nothing "Line format" $ 
-        CliParameter (set lineFormat) "FORMAT"
+        CliParameter (lineFormat :$ id) "FORMAT"
     , CliParam "verbosity" (Just 'v') "Message verbosity" $ 
-        CliParameter (lmVerbosity =§ read) "NUMBER"
+        CliParameter (lmVerbosity :$ read) "NUMBER"
     ]
   , _perFileAttrs = [
       CliParam "format" (Just 'f') "Log format (used when automatic detection fails)" $ 
-        CliParameter (format =§ Just) "LOG_FORMAT"
+        CliParameter (format :$ Just) "LOG_FORMAT"
     , CliParam "offset" (Just 'o') "Specify time offset for a log" $ 
-        CliParameter (timeOffset =§ (secondsToDiffTime . read)) "SECONDS"
+        CliParameter (timeOffset :$ (secondsToDiffTime . read)) "SECONDS"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $
-        CliFlag (set mergeSame)
+        CliFlag mergeSame
     ]
   }
   where
     s =§ f = \a → set s (f a)
+    process = (mapped . setter)  %~ (.→ s0)
 
-mkInput name cfg = Input {
+mkInput l0 name cfg = Input {
     _fileName = name
   , _timeOffset = 0
-  , _mergeSame = _g_mergeSame cfg
+  , _mergeSame = cfg ^. l0 . g_mergeSame
   , _format = Nothing
   }
 
@@ -215,15 +221,21 @@ cliMergerMain' logFormats = do
           >-> ("Broken pretty printer pipe." <! pprint)
           >-> ("Broken sink pipe." <! sink)
 
-cliMergerMain ∷ LogMerger Input              -- ^ Default options
-              → [LogFormat]                  -- ^ List of supported log formats
+cliMergerMain ∷ Lens' (s0 Input) (LogMerger Input)
+              → s0 Input                               -- ^ Default options
+              → [LogFormat]                            -- ^ List of supported log formats
               → IO ()
-cliMergerMain cfg0 logFormats = do
+cliMergerMain s0 cfg0 logFormats = do
   files ← newIORef []
-  let stuff i = over input (i:)
-  cli ← parseCli helpPreamble (helpPostamble logFormats) cfg0 mkInput stuff cliAttr
+  let stuff i = s0 . input %~ (i:)
+  cli ← parseCli helpPreamble
+                 (helpPostamble logFormats)
+                 cfg0
+                 (mkInput s0)
+                 stuff
+                 (cliAttr s0)
   let gv = GlobalVars {
-                 _cfg = cli
+                 _cfg = cli ^. s0
                , _resMan = files
                }
   runApp gv $ cliMergerMain' logFormats
