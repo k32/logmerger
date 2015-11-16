@@ -89,9 +89,10 @@ instance Monoid (CliDescr a b) where
 -- | Expand shortcuts
 expandCli ∷ [String] → [String]
 expandCli = (>>= f)
-  where f x@(h:t) = case h of
-                      '-' | head t /= '-' → g t
-                      _ → [x]
+  where f ('-':t)
+          | head t /= '-' = g t
+        f x = [x]
+
         g [] = []
         g ('n':f:t) = ("-n" ++ [f]):g t
         g (f:t) = ('-':[f]):g t

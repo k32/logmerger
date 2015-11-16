@@ -2,11 +2,10 @@
 module Data.Attoparsec.Combinator.Skip (
     skipManyTill
   , matchManyTill
-  , Skippable(..)
+  --, Skippable(..)
   ) where
 
 import Control.Applicative
-import Control.Monad
 import qualified Data.ByteString as B
 import Data.Attoparsec.ByteString
 import Data.Attoparsec.Combinator

@@ -94,7 +94,6 @@ cliAttr s0 = CliDescr {
     ]
   }
   where
-    s =§ f = \a → set s (f a)
     process = (mapped . setter)  %~ (.→ s0)
 
 mkInput l0 name cfg = Input {
@@ -121,8 +120,8 @@ cliDefaults = LogMerger {
 type Fin = IORef [IO ()]
 
 data GlobalVars = GlobalVars {
-    _cfg    ∷ LogMerger Input
-  , _resMan ∷ Fin 
+    _myConfig    ∷ LogMerger Input
+  , _resMan      ∷ Fin 
   }
 makeLenses ''GlobalVars
 
@@ -161,14 +160,14 @@ openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m , MonadReader 
         → m (Producer SGSNBasicEntry m (Either String ()))
 openLog logFormats dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
   LogFormat {_dissector=diss} ← logFormat logFormats fmt fn
-  follow' ← view (cfg . g_follow) >>= \case
-              True → follow <$> view (cfg . g_followInterval)
+  follow' ← view (myConfig . g_follow) >>= \case
+              True → follow <$> view (myConfig . g_followInterval)
               False → return id
-  let mergeSame = if mgs
-                    then mergeSameOrigin
-                    else id
+  let mergeSamePipe = if mgs
+                        then mergeSameOrigin
+                        else id
   -- p0 ← diss dt fn <$> P.fromHandleFollow follow' <$> openFile'' fn ReadMode
-  p0 ← mergeSame <$> diss dt fn <$> follow' <$> P.fromHandle <$> openFile'' fn ReadMode
+  p0 ← mergeSamePipe <$> diss dt fn <$> follow' <$> P.fromHandle <$> openFile'' fn ReadMode
   return $ if mgs
     then p0
     else p0 
@@ -179,7 +178,7 @@ printError = liftIO . hPutStrLn stderr . ("(Logmerger.hs) ERROR: " ++)
 
 printInfo ∷ (MonadIO m, MonadReader GlobalVars m) ⇒ Int → String → m ()
 printInfo s m = do
-  v ← asks $ _lmVerbosity . _cfg
+  v ← asks $ _lmVerbosity . _myConfig
   when (v >= s) $ liftIO . hPutStrLn stderr $ "(Logmerger.hs) INFO: " ++ m
 
 runApp ∷ r → WarningT [String] String (ReaderT r IO) a → IO ()
@@ -199,14 +198,14 @@ cliMergerMain' logFormats = do
     , _lineFormat = lf
     , _g_tzInfo = tzf
     , _g_timeZone = tz
-    } ← asks _cfg
+    } ← asks _myConfig
   pprint ← makeLogEntryPP hf lf
   localTimeOffset ← case tz of 
     Just tz' → return tz'
     Nothing  → case tzf of
       Nothing   → return 0
       Just tzf' → errorToWarning (:[]) (const $ return 0) $ readTzInfo tzf'
-  printInfo 3 =<< ("Configuration: " ++) . show <$> asks _cfg
+  printInfo 3 =<< ("Configuration: " ++) . show <$> asks _myConfig
   printInfo 1 $ "POSIX time offset: " ++ (show localTimeOffset)
   sink ← case outputFile of
     "-" → return P.stdout
@@ -235,7 +234,7 @@ cliMergerMain s0 cfg0 logFormats = do
                  stuff
                  (cliAttr s0)
   let gv = GlobalVars {
-                 _cfg = cli ^. s0
+                 _myConfig = cli ^. s0
                , _resMan = files
                }
   runApp gv $ cliMergerMain' logFormats

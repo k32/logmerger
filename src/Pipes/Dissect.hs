@@ -27,7 +27,7 @@ myParser = ("Foo" >> return Foo)
 main = runEffect $ print ~< parse myParser `evalStateT` yield "FooFooFooBarBarFoo"
 @
 
--}
+``-}
 {-# LANGUAGE UnicodeSyntax, RankNTypes #-}
 module Pipes.Dissect (
     Dissector

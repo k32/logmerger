@@ -19,7 +19,6 @@ module Control.Monad.Warning (
 
 import Control.Applicative
 import Control.Monad.Except
-import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Data.Monoid
