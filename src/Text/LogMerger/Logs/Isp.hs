@@ -30,7 +30,7 @@ import Prelude hiding (takeWhile)
 logFormat ∷ LogFormat
 logFormat = LogFormat {
     _dissector = ispDissector
-  , _nameRegex = mkRegex "isp.log$"
+  , _nameRegex = mkRegex "isp\\.log$"
   , _formatName = "sgsn-mme-isp"
   , _formatDescription = "Isp log of SGSN-MME nodes"
   }

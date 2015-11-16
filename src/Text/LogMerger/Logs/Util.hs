@@ -8,6 +8,7 @@ module Text.LogMerger.Logs.Util (
  , follow
  , (<!)
  , yymmdd
+ , yymmdd'
  , hhmmss
  ) where
 
@@ -39,9 +40,14 @@ import Data.Time (
   , Day
   )
 
+yymmdd' ∷ B.ByteString → Parser Day
+yymmdd' s = fromGregorian <$> decimal
+                          <*> (string s *> decimal)
+                          <*> (string s *> decimal) <* skipSpace <?> "date"
+
 -- | Read date in form "yyyy-mm-dd"
 yymmdd ∷ Parser Day
-yymmdd = fromGregorian <$> decimal <*> ("-" *> decimal) <*> ("-" *> decimal) <* skipSpace <?> "date"
+yymmdd = yymmdd' "-"
 
 -- | Read time in form "hh:mm:ss"
 hhmmss ∷ Parser DiffTime

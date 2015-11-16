@@ -24,7 +24,7 @@ import Prelude hiding (takeWhile)
 logFormat ∷ LogFormat
 logFormat = LogFormat {
     _dissector = cliDissector 
-  , _nameRegex = mkRegex "cli_log.[0-9]+$"
+  , _nameRegex = mkRegex "cli_log\\.[0-9]+$"
   , _formatName = "sgsn-mme-cli"
   , _formatDescription = "CLI logs of an SGSN-MME node"
   }

@@ -18,7 +18,7 @@ import Prelude hiding (takeWhile)
 
 logFormat = LogFormat {
     _dissector = \_ f p0 → (fmaDissector f) `evalStateT` p0
-  , _nameRegex = mkRegex "fm_(event|alarm).[0-9]+$"
+  , _nameRegex = mkRegex "fm_(event|alarm)\\.[0-9]+$"
   , _formatName = "sgsn-mme-fm"
   , _formatDescription = "Log of Fault Management events and alarms of an SGSN-MME node"
   }
