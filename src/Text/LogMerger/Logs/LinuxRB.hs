@@ -43,12 +43,12 @@ logFormat = LogFormat {
 type Tags = M.Map Word32 B.ByteString
 
 myDissector ∷ LogDissector
-myDissector dt fn p0 = dissect `evalStateT` p0
+myDissector = evalStateT dissect
   where dissect = parse getTags >>= \case
                     Left x → return $ Left x
                     Right tags → do
                       parse $ manyTill anyChar (lookAhead entryHead)
-                      tillEnd (entry dt fn tags)
+                      tillEnd (entry tags)
 
 line s = string s >> endOfLine
 
@@ -61,20 +61,18 @@ entryHead ∷ Parser (Int, Word32)
 entryHead = (,) <$> ("~RB03~[" *> hex')
                 <*> (hex' <* "]")
 
-entry ∷ NominalDiffTime 
-      → String
-      → Tags
+entry ∷ Tags
       → Parser SGSNBasicEntry
-entry dt fn tags = do
+entry tags = do
   (d, t) ← entryHead <?> "RB_entry_head"
   txt ← matchManyTill anyChar (() <$ entryHead <|> endOfInput)
   let t'' = case M.lookup t tags of
               Nothing → "???"
               Just "undefined_tag" → "tag #" ++ show t
-              Just x  → fmap (toEnum . fromIntegral) $ B.unpack x
+              Just x → fmap (toEnum . fromIntegral) $ B.unpack x
   return BasicLogEntry {
-      _basic_date = dt `addUTCTime` posixSecondsToUTCTime (fromIntegral d)
-    , _basic_origin = t'' `OCons` Location fn
+      _basic_date = posixSecondsToUTCTime (fromIntegral d)
+    , _basic_origin = [OData t'']
     , _basic_text = txt
     }
 

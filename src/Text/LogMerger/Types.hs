@@ -6,6 +6,7 @@ module Text.LogMerger.Types (
  , basic_text
  , Origin(..)
  , DateTime
+ , TimeAs(..)
  , module Data.Time
  ) where
 
@@ -21,11 +22,10 @@ import Control.Lens
 
 type DateTime = UTCTime
 
+data TimeAs = AsUTC | AsLocalTime | AsUnixTime
+
 data Origin o =
-  OCons {
-    _odata ∷ o
-  , _onext ∷ Origin o
-  }
+    OData o
   | Location {
     _file   ∷ FilePath
   -- TODO: We've had a problem. Looks like attoparsec doesn't keep offset
@@ -36,7 +36,7 @@ data Origin o =
 data BasicLogEntry o =
   BasicLogEntry {
     _basic_date   ∷ DateTime
-  , _basic_origin ∷ Origin o
+  , _basic_origin ∷ [Origin o]
   , _basic_text   ∷ B.ByteString
   } deriving (Eq, Data, Typeable)
 makeLenses ''BasicLogEntry
@@ -48,4 +48,4 @@ deriving instance (Show o) ⇒ Show (BasicLogEntry o)
 
 instance (Show o) ⇒ Show (Origin o) where
   show (Location {_file = f}) = f
-  show (OCons {_odata = o, _onext = n}) = (show n) ++ ':':(show o)
+  show (OData o) = show o

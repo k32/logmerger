@@ -12,6 +12,7 @@ module Text.LogMerger (
   ) where
 
 import Pipes
+import qualified Pipes.Prelude as PPr
 import Pipes.Interleave
 import qualified Pipes.ByteString as P
 import Text.CLI
@@ -40,7 +41,7 @@ data Input =
   Input {
     _fileName ∷ String
   , _format ∷ Maybe String
-  , _timeOffset ∷ DiffTime
+  , _timeOffset ∷ NominalDiffTime
   , _mergeSame ∷ Bool
   } deriving (Show)
 makeLenses ''Input
@@ -88,7 +89,7 @@ cliAttr s0 = CliDescr {
       CliParam "format" (Just 'f') "Log format (used when automatic detection fails)" $ 
         CliParameter (format :$ Just) "LOG_FORMAT"
     , CliParam "offset" (Just 'o') "Specify time offset for a log" $ 
-        CliParameter (timeOffset :$ (secondsToDiffTime . read)) "SECONDS"
+        CliParameter (timeOffset :$ (fromInteger . read)) "SECONDS"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $
         CliFlag mergeSame
     ]
@@ -152,25 +153,70 @@ logFormat logFormats fmt fname =
                  Nothing → find (isJust . (flip matchRegex) fname . _nameRegex)
                  Just fmt' → find ((==fmt') . _formatName)
 
+refactorMe ∷ (Monad m) ⇒ (a → b) → Producer a m r → Producer b m r
+refactorMe f p = do
+  n ← lift $ next p
+  case n of
+    Left r → return r
+    Right (x, p') → do
+      yield $ f x
+      refactorMe f p'
+
 -- TODO: Refactor me
-openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m , MonadReader GlobalVars m)
+openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m, MonadReader GlobalVars m)
         ⇒ [LogFormat]
-        → NominalDiffTime 
+        → NominalDiffTime
+        → NominalDiffTime
         → Input 
         → m (Producer SGSNBasicEntry m (Either String ()))
-openLog logFormats dt (Input{_fileName = fn, _mergeSame = mgs, _format = fmt}) = do
-  LogFormat {_dissector=diss} ← logFormat logFormats fmt fn
+openLog logFormats unixTimeOffset timezone inputSpec = do
+  let Input{ _fileName = fn
+           , _mergeSame = mgs
+           , _format = fmt
+           , _timeOffset = dt
+           } = inputSpec
+  LogFormat { _dissector = diss
+            , _timeAs = timeAs
+            } ← logFormat logFormats fmt fn
+  -- Follow pipe determines whether file should be read periodically or just once
   follow' ← view (myConfig . g_follow) >>= \case
               True → follow <$> view (myConfig . g_followInterval)
               False → return id
   let mergeSamePipe = if mgs
                         then mergeSameOrigin
                         else id
+      -- Post process pipe does time conversion and adds filename to the origin
+      postProcessPipe = refactorMe $ case timeAs of
+                                       AsLocalTime → asLocalTime dt fn
+                                       AsUnixTime → asUnixTime unixTimeOffset dt fn
+                                       AsUTC → asUTCTime timezone dt fn
   -- p0 ← diss dt fn <$> P.fromHandleFollow follow' <$> openFile'' fn ReadMode
-  p0 ← mergeSamePipe <$> diss dt fn <$> follow' <$> P.fromHandle <$> openFile'' fn ReadMode
-  return $ if mgs
-    then p0
-    else p0 
+  p0 ← mergeSamePipe <$> postProcessPipe <$> diss <$> follow' <$>
+         P.fromHandle <$> openFile'' fn ReadMode
+  return p0
+
+asLocalTime ∷ NominalDiffTime
+            → String
+            → SGSNBasicEntry
+            → SGSNBasicEntry
+asLocalTime dt fn e@BasicLogEntry{_basic_origin = o, _basic_date = d} =
+  e{_basic_origin = Location fn : o, _basic_date = dt `addUTCTime` d}
+
+asUnixTime ∷ NominalDiffTime
+           → NominalDiffTime
+           → String
+           → SGSNBasicEntry
+           → SGSNBasicEntry
+asUnixTime udt dt fn e@BasicLogEntry{_basic_origin = o, _basic_date = d} =
+  e{_basic_origin = Location fn : o, _basic_date = (dt + udt) `addUTCTime` d}
+
+asUTCTime ∷ NominalDiffTime
+           → NominalDiffTime
+           → String
+           → SGSNBasicEntry
+           → SGSNBasicEntry
+asUTCTime tz dt fn e@BasicLogEntry{_basic_origin = o, _basic_date = d} =
+  e{_basic_origin = Location fn : o, _basic_date = (dt + tz) `addUTCTime` d}
 
 printWarning, printError ∷ (MonadIO m) ⇒ String → m ()
 printWarning = liftIO . hPutStrLn stderr . ("(Logmerger.hs) WARNING: " ++)
@@ -210,7 +256,8 @@ cliMergerMain' logFormats = do
   sink ← case outputFile of
     "-" → return P.stdout
     _   → P.toHandle <$> openFile'' outputFile WriteMode
-  logs ← errorsToWarnings (:[]) $ map (openLog logFormats localTimeOffset) inputFiles
+  let timezone = 0 -- TODO
+  logs ← errorsToWarnings (:[]) $ map (openLog logFormats localTimeOffset timezone) inputFiles
   {- Building the pipeline -}
   let merged = interleaveBy (compare `on` _basic_date) logs
       parsingErrors r = do

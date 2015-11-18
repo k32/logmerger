@@ -17,25 +17,23 @@ import Text.LogMerger.Logs.Util
 import Prelude hiding (takeWhile)
 
 logFormat = LogFormat {
-    _dissector = \_ f p0 → (fmaDissector f) `evalStateT` p0
+    _dissector = evalStateT fmaDissector
   , _nameRegex = mkRegex "fm_(event|alarm)\\.[0-9]+$"
   , _formatName = "sgsn-mme-fm"
   , _formatDescription = "Log of Fault Management events and alarms of an SGSN-MME node"
+  , _timeAs = AsLocalTime
   }
 
 fmaDissector ∷ (Monad m)
-             ⇒ FilePath
-             → Dissector SGSNBasicEntry m (Either String ())
-fmaDissector file = tillEnd $ do
+             ⇒ Dissector SGSNBasicEntry m (Either String ())
+fmaDissector = tillEnd $ do
   b ← count 4 $ takeTill (==';') <* ";"
   skipWhile isSpace
   day ← (yymmdd <* skipWhile isSpace) <?> "Day"
   time ← (hhmmss <* ";") <?> "Time"
   rest ← (takeTill (=='\n') <* "\n") <?> "rest"
   return BasicLogEntry {
-      _basic_origin   = Location {
-           _file = file
-         }
+      _basic_origin = []
     , _basic_date = UTCTime {
           utctDay     = day
         , utctDayTime = time

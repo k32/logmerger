@@ -27,18 +27,17 @@ logFormat = LogFormat {
   , _nameRegex = mkRegex "cli_log\\.[0-9]+$"
   , _formatName = "sgsn-mme-cli"
   , _formatDescription = "CLI logs of an SGSN-MME node"
+  , _timeAs = AsLocalTime
   }
                       
 cliDissector ∷ LogDissector
-cliDissector _ fn p0 = diss `evalStateT` p0
+cliDissector = evalStateT diss
   where diss = tillEnd $ do  
           day ← yymmdd <* skipSpace
           time ← hhmmss <* ","
           txt ← takeTill (=='\n') <* endOfLine
           return BasicLogEntry {
-              _basic_origin = Location {
-                   _file = fn
-                 }
+              _basic_origin = []
             , _basic_date = UTCTime {
                   utctDay     = day
                 , utctDayTime = time

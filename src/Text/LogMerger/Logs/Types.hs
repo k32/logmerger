@@ -6,6 +6,7 @@ module Text.LogMerger.Logs.Types (
   , SGSNOrigin
   , SGSNBasicEntry
   , module Text.Regex
+  , module Text.LogMerger.Types
   ) where
 
 import Pipes
@@ -21,14 +22,13 @@ type SGSNOrigin = String
 type SGSNBasicEntry = BasicLogEntry SGSNOrigin
 
 type LogDissector = ∀ m a . (Monad m) 
-                  ⇒ NominalDiffTime 
-                  → FilePath 
-                  → Producer P.ByteString m a
+                  ⇒ Producer P.ByteString m a
                   → Producer SGSNBasicEntry m (Either String ())
 
 data LogFormat = LogFormat {
-    _dissector    ∷ LogDissector
-  , _nameRegex    ∷ Regex
-  , _formatName   ∷ String
-  , _formatDescription ∷ String
+    _dissector    ∷ LogDissector  -- ^ Parser splitting bytestream to entries
+  , _nameRegex    ∷ Regex         -- ^ Regex used to pick dissector for a file
+  , _formatName   ∷ String        -- ^ Name of log format, used in manual parser picking
+  , _formatDescription ∷ String   -- ^ Description of the log format
+  , _timeAs       ∷ TimeAs        -- ^ How to interpret timestamps
   }

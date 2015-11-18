@@ -33,19 +33,17 @@ logFormat = LogFormat {
   , _nameRegex = mkRegex "isp\\.log$"
   , _formatName = "sgsn-mme-isp"
   , _formatDescription = "Isp log of SGSN-MME nodes"
+  , _timeAs = AsLocalTime
   }
 
-logEntry ∷ String 
-         → Parser SGSNBasicEntry
-logEntry fn = do
+logEntry ∷ Parser SGSNBasicEntry
+logEntry = do
   day ← yymmdd <* skipSpace
   time ← hhmmss <* skipSpace
   off ← "UTC" *> signed decimal <* (skipSpace >> ";") -- TODO: do something with off
   txt ← takeTill (=='\n') <* (endOfLine <|> endOfInput)
   return BasicLogEntry {
-        _basic_origin   = Location {
-             _file = fn
-           }
+        _basic_origin = []
       , _basic_date = UTCTime {
             utctDay     = day
           , utctDayTime = time
@@ -54,7 +52,6 @@ logEntry fn = do
       }
 
 ispDissector ∷ LogDissector
-ispDissector _ fn p0 = diss `evalStateT` p0 
-  where diss = do
-          parse ("Content of isp.log\n==================\n" <?> "isp.log header")
-          tillEnd $ logEntry fn 
+ispDissector = evalStateT $ do
+  parse ("Content of isp.log\n==================\n" <?> "isp.log header")
+  tillEnd logEntry
