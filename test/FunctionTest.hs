@@ -56,7 +56,7 @@ instance Arbitrary SGSNBasicEntry where
     txt ← arbitrary
     return BasicLogEntry {
         _basic_date = t
-      , _basic_origin = Location "TestFile"
+      , _basic_origin = [] -- [Location "TestFile"]
       , _basic_text = fromString txt
       }
 
@@ -114,7 +114,7 @@ prop_CLILogParse (chunkSize, ltOffset, l) =
       , _basic_text = t
       } = concat [formatTime defaultTimeLocale "%F %T" d, ",", byteStringToString t, "\n"] 
     pprint = fromString $ l >>= printEntry
-    parser = (_dissector CLI.logFormat) (fromIntegral ltOffset) "TestFile"
+    parser = _dissector CLI.logFormat
   in
     all isOneLiner l ==> okParser pprint chunkSize parser l
 
@@ -130,7 +130,7 @@ prop_IspLogParse (chunkSize, ltOffset, l) =
         "Content of isp.log\n==================\n"
       , l >>= printEntry
       ]
-    parser = (_dissector ISP.logFormat) (fromIntegral ltOffset) "TestFile"
+    parser = _dissector ISP.logFormat
   in
     all isOneLiner l ==> okParser pprint chunkSize parser l
 
@@ -140,9 +140,8 @@ prop_RibgbufferParse (ltOffset, chunkSize, remains, tags0, l) =
   let
     tags = map toString tags0
     n_tags = length tags
-    appendTag t o = t'' `OCons` o
-      where t'' = tags !! t'
-            t' = (fromIntegral t) `rem` n_tags
+    appendTag t o = OData (tags !! t') : o
+      where t' = (fromIntegral t) `rem` n_tags
     entries = map (\(t, e) → e & basic_origin %~ appendTag t) l
     tags' = M.fromList $ zip tags [0 ∷ Int ..]
     formatEntry BasicLogEntry{
@@ -150,9 +149,9 @@ prop_RibgbufferParse (ltOffset, chunkSize, remains, tags0, l) =
                   , _basic_text = txt
                   , _basic_origin = o
                   } = printf "~RB03~[%08X %02X]%s" (d' ∷ Int) o' txt'
-      where d' = (round $ utcTimeToPOSIXSeconds d) - ltOffset
+      where d' = (round $ utcTimeToPOSIXSeconds d)
             o' = tags' M.! t
-            t `OCons` _ = o
+            (OData t): _ = o
             txt' = byteStringToString txt
     pprint = fromString $ concat [
         (printf "RB03\nDump of %d tags\nHEX String\n--- --------------------------------------------------------------\n" n_tags)
@@ -160,7 +159,7 @@ prop_RibgbufferParse (ltOffset, chunkSize, remains, tags0, l) =
       , remains
       , entries >>= formatEntry
       ]
-    parser = (_dissector RB.logFormat) (fromIntegral ltOffset) "TestFile"
+    parser = _dissector RB.logFormat
   in
     (n_tags > 0 && n_tags < 256) && (length (nub tags) == length tags) && (all (not . null) tags) ==>
     okParser pprint chunkSize parser entries
@@ -186,12 +185,12 @@ prop_mergeSameContentConservation ∷ [(String, UTCTime, [String])]
 prop_mergeSameContentConservation l = (length e == length e') .&&. all eq (zip e e')
   where mkLogEntries = each [BasicLogEntry {
                                _basic_date = d
-                             , _basic_origin = Location o
+                             , _basic_origin = [Location o]
                              , _basic_text = fromString i
                              } | (o, d, s) ← l, i ← s]
         e = [BasicLogEntry {
                _basic_date = d
-             , _basic_origin = Location o
+             , _basic_origin = [Location o]
              , _basic_text = fromString $ concat s
              } | (o, d, s) ← l, not (null s)]
         (_, e') = sink $ mergeSameOrigin mkLogEntries

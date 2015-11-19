@@ -38,6 +38,7 @@ logFormat = LogFormat {
   , _nameRegex = mkRegex "log\\.rb(\\.old)?$"
   , _formatName = "sgsn-mme-linux-rb"
   , _formatDescription = "Ringbuffer of SGSN-MME boards running Linux"
+  , _timeAs = AsUnixTime
   }
 
 type Tags = M.Map Word32 B.ByteString
