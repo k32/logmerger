@@ -35,15 +35,14 @@ logFormat = LogFormat {
   , _nameRegex = mkRegex "mmi_log\\.[0-9]+$"
   , _formatName = "sgsn-mme-mmi"
   , _formatDescription = "MMI log of SGSN-MME"
+  , _timeAs = AsLocalTime
   }
 
 myDissector ∷ LogDissector
-myDissector _ fn p0 = dissect `evalStateT` p0
-  where dissect = tillEnd (entry fn)
+myDissector = evalStateT $ tillEnd entry
 
-entry ∷ String
-      → Parser SGSNBasicEntry
-entry fn = do
+entry ∷ Parser SGSNBasicEntry
+entry = do
   let header = do
         reqrepl ← ("REQUEST " <|> "REPLY ") <?> "reqrepl"
         d ← ("Date:" *> yymmdd' "/" <* ",") <?> "date"
@@ -56,6 +55,6 @@ entry fn = do
           utctDay = d
         , utctDayTime = t
         }
-    , _basic_origin = Location fn
+    , _basic_origin = []
     , _basic_text = B.concat [reqrepl, txt]
     }
