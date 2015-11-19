@@ -21,7 +21,6 @@ executable LogMerger
                      , mtl >=2.2 && <2.3
                      , time >=1.5 && <1.6
                      , containers >=0.5 && <0.6
-                     , transformers >=0.4 && <0.5
                      , attoparsec >=0.13 && <0.14
                      , regex-compat >=0.95 && <0.96
                      , lens == 4.*
@@ -39,7 +38,6 @@ Test-Suite FunctionTest
                      , mtl >=2.2 && <2.3
                      , time >=1.5 && <1.6
                      , containers >=0.5 && <0.6
-                     , transformers >=0.4 && <0.5
                      , attoparsec >=0.13 && <0.14
                      , regex-compat >=0.95 && <0.96
                      , lens == 4.*
@@ -69,7 +67,6 @@ executable LogViewer
                      , snap-core >=0.9 && <0.10
                      , snap-server >= 0.9.5 && <0.9.6
                      , time >=1.5 && <1.6
-                     , transformers >=0.4 && <0.5
   else
     buildable:         False   
   other-extensions:    DeriveDataTypeable, UnicodeSyntax, OverloadedStrings, FlexibleContexts, GADTs, Rank2Types, TemplateHaskell, BangPatterns, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, UndecidableInstances, StandaloneDeriving, TupleSections, NoMonomorphismRestriction, ScopedTypeVariables, KindSignatures
