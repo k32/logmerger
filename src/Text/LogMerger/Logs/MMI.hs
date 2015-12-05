@@ -44,10 +44,18 @@ myDissector = evalStateT $ tillEnd entry
 entry ∷ Parser SGSNBasicEntry
 entry = do
   let header = do
-        reqrepl ← ("REQUEST " <|> "REPLY ") <?> "reqrepl"
-        d ← ("Date:" *> yymmdd' "/" <* ",") <?> "date"
-        t ← (skipSpace >> "Time:" *> hhmmss) <?> "time"
+        reqrepl ← ("REQUEST" <|> "REPLY") <?> "header/reqrepl"
+        skipSpace
+        (d, t) ← header_old <|> header_new
         return (reqrepl, d, t)
+      header_old = do
+        d ← ("Date:" *> yymmdd' "/" <* ",") <?> "header_old/date"
+        t ← (skipSpace >> "Time:" *> hhmmss) <?> "header_old/time"
+        return (d, t)
+      header_new = do
+        d ← yymmdd <* "T" <?> "header_new/date"
+        t ← hhmmss <?> "header_new/time"
+        return (d, t)
   (reqrepl, d, t) ← header
   txt ← matchManyTill anyChar (() <$ header <|> endOfInput)
   return BasicLogEntry {
