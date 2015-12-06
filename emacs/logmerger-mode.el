@@ -1,3 +1,5 @@
+(require 'cl)
+
 (defconst logmerger-re-begin-entry
   "^~~~ ")
 
@@ -10,6 +12,45 @@
 (defconst logmerger-re-any-origin
   ".*")
 
+(cl-defstruct logmerger-entry timestamp origin)
+
+(cl-defstruct logmerger-origin (boring nil) face)
+
+(defmacro logmerge-transform-record (getter setter field transform)
+  )
+
+(defmacro logmerger-conf (table key &optional field area transform)
+  "Get value from the ``table''. Table may be default or buffer-local.\
+  \Buffer local bindings override default ones unless ``area'' is\
+  \specified explicitly."
+  (let* ((table-s (concat "logmerger-" (symbol-name table)))
+         (table-prefixed (intern table-s))
+         (accessor (intern (concat table-s "-" (symbol-name field))))
+         (trans (if transform
+                    transform
+                  `(lambda (a) a)))
+         (access (if field
+                     accessor
+                   `(lambda (a) a)))
+         (read-tab-local `(cdr (assoc-string ,key ,table-prefixed)))
+         (read-tab-default `(cdr (assoc-string ,key (default-value (quote ,table-prefixed)))))
+         (read-table (pcase area
+                       (`nil  `(let ((local ,read-tab-local)
+                                     (default ,read-tab-default))
+                                 (if local
+                                     local
+                                   default)))
+                       (`default read-tab-default)
+                       (`local read-tab-local)))
+         (only-access `(let ((val ,read-table))
+                         (if val
+                             (,access val))))
+         (transform-local `())
+         (do-transform ()))
+    (if transform
+        do-transform
+      only-access)))
+   
 (defun logmerger-make-header-re (date time origin)
   "Construct a regular expression matching specific or any entry header"
   (concat logmerger-re-begin-entry
@@ -31,70 +72,77 @@
     (re-search-backward logmerger-re-entry-header)
     (let ((date (parse-time-string (match-string 1)))
           (origin (match-string 2)))
-      (list date origin))))
-
-(defun logmerger-format-mode-line ()
-  "Format mode line according to the current log entry"
-  (interactive)
-  (let* ((date-origin (logmerger-current-entry-info))
-         (date (car date-origin))
-         (origin (car (cdr date-origin))))
-    (print date)))
+      (make-logmerger-entry :timestamp date :origin origin))))
 
 (defvar logmerger-highlights
   '((logmerger-re-begin-entry . font-lock-string-face)
     (logmerger-re-line-begin . font-lock-comment-face)))
 
-(defun logmerger-jump (direction n)
+;;;; Moving around ;;;;
+
+(defmacro logmerger-go (direction stopp n)
   "Jump to the next or previous entry"
-  (funcall direction logmerger-re-entry-header)
-  (recenter))
+  (let ((jump (pcase direction
+                (`forward `(progn (end-of-line)
+                                  (re-search-forward logmerger-re-entry-header)))
+                (`backward `(progn (beginning-of-line)
+                                   (re-search-backward logmerger-re-entry-header))))))
+    `(progn
+       (let 
+           ((old-state (logmerger-current-entry-info)))
+         ,jump
+         (dotimes (i ,n)
+           (while (not (funcall ,stopp old-state (logmerger-current-entry-info)))
+             ,jump))
+         (recenter)))))
 
-(defun logmerger-jump-same-origin (direction n)
-  "Jump to the next or previous log entry with the same origin"
-  (let* ((date-time-origin (logmerger-current-entry-info))
-         (origin (car (cdr date-time-origin))))
-    (funcall direction (logmerger-make-header-re
-                       logmerger-re-any-date
-                       logmerger-re-any-time
-                       origin)))
-  (recenter))
+(defmacro logmerger-defgo (fun-name description key direction stopp)
+  (let ((full-name (intern (concat "logmerger-go-" (symbol-name direction) fun-name))))
+    `(progn 
+       (defun ,full-name (n)
+         ,(concat "Go " (symbol-name direction) description)
+         (interactive "p")
+         (logmerger-go ,direction ,stopp n))
+       ,(when key
+          `(define-key logmerger-mode-map (kbd ,key) (quote ,full-name))))))
 
-(defun logmerger-to-next-entry (n)
-  "Jump to the next log entry"
+;; Boring origins
+(defun logmerger-boring-origin-set (p)
+  "Declare current origin as ``boring''."
   (interactive "p")
-  (logmerger-jump 're-search-forward n))
+  (if (= p 1)
+      ()))
+  
 
-(defun logmerger-to-prev-entry (n)
-  "Jump to the previous log entry"
-  (interactive "p")
-  (logmerger-jump 're-search-backward n))
+;; Just go back and forth
 
-(defun logmerger-to-next-same-origin (n)
-  "Jump to the next log entry"
-  (interactive "p")
-  (logmerger-jump-same-origin 're-search-forward n))
+(logmerger-defgo "" "" "SPC" forward (lambda (a b) t))
+(logmerger-defgo "" "" "<backspace>" backward (lambda (a b) t))
 
-(defun logmerger-to-prev-same-origin (n)
-  "Jump to the previous log entry"
-  (interactive "p")
-  (logmerger-jump-same-origin 're-search-backward n))
+;; Go to the same origin
+(defun logmerger-same-origin (a b)
+  (equal (logmerger-entry-origin b) (logmerger-entry-origin a)))
+
+(logmerger-defgo "-origin" " to an entry with the same origin" "RET"
+                 forward 'logmerger-same-origin)
+(logmerger-defgo "-origin" " to an entry with the same origin" "S-RET"
+                 backward 'logmerger-same-origin)
+
+;; Time
+(defmacro logmerger-go-dt (direction dt)
+  `(lambda (a b)
+     (let* ((ta (apply 'encode-time (logmerger-entry-timestamp a)))
+            (tb (apply 'encode-time (logmerger-entry-timestamp b)))
+            (this-dt ,(pcase direction
+                        (`forward `(- tb ta))
+                        (`backward `(- ta tb)))))
+       (>= this-dt ,dt))))
+
+(logmerger-defgo "-minute" "" "m" forward (logmerger-go-dt forward 60))
 
 (define-derived-mode logmerger-mode text-mode "Log"
   "Major mode for viewing LogMerger output"
   (read-only-mode t)
   (setq font-lock-defaults '(() nil nil nil logmerger-highlights)))
-
-(define-key logmerger-mode-map
-  (kbd "SPC") 'logmerger-to-next-entry)
-
-(define-key logmerger-mode-map
-  (kbd "S-SPC") 'logmerger-to-next-same-origin)
-
-(define-key logmerger-mode-map
-  (kbd "S-<backspace>") 'logmerger-to-prev-same-origin)
-
-(define-key logmerger-mode-map
-  [backspace] 'logmerger-to-prev-entry)
 
 (provide 'logmerger-mode)

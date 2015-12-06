@@ -11,3 +11,10 @@ realtest
 *.hp
 web/3rdparty
 **/cabal.sandbox.config
+TODO.ics
+
+TODO.org
+
+merged
+
+emacs/logmerger-mode.elc
