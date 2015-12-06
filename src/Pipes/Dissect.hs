@@ -38,7 +38,7 @@ module Pipes.Dissect (
   , tillEnd
   ) where
 
-import Control.Monad.Trans.State.Strict as S
+import Control.Monad.State.Strict as S
 import qualified Data.ByteString as B
 import qualified Data.Attoparsec.ByteString as A
 import Pipes
