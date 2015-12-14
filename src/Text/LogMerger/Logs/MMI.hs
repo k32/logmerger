@@ -53,8 +53,10 @@ entry = do
         t ← (skipSpace >> "Time:" *> hhmmss) <?> "header_old/time"
         return (d, t)
       header_new = do
+        "Timestamp:"
         d ← yymmdd <* "T" <?> "header_new/date"
         t ← hhmmss <?> "header_new/time"
+        "Z"
         return (d, t)
   (reqrepl, d, t) ← header
   txt ← matchManyTill anyChar (() <$ header <|> endOfInput)
