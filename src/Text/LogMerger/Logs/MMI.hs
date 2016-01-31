@@ -35,7 +35,7 @@ logFormat = LogFormat {
   , _nameRegex = mkRegex "mmi_log\\.[0-9]+$"
   , _formatName = "sgsn-mme-mmi"
   , _formatDescription = "MMI log of SGSN-MME"
-  , _timeAs = AsLocalTime
+  , _timeAs = AsUTC
   }
 
 myDissector ∷ LogDissector

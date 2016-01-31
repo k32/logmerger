@@ -5,6 +5,7 @@ import qualified Text.LogMerger.Logs.CLI as CLI
 import qualified Text.LogMerger.Logs.FM as FM
 import qualified Text.LogMerger.Logs.LinuxRB as LinRB
 import qualified Text.LogMerger.Logs.MMI as MMI
+-- import qualified Text.LogMerger.Logs.MonitoringAp as MonAp
 import Control.Lens
 
 data VSGSNCfg i = VSGSNCfg {
@@ -21,7 +22,7 @@ vsgsnDefaults = VSGSNCfg {
 
 logFormats ∷ [LogFormat]
 logFormats = [ISP.logFormat, CLI.logFormat, LinRB.logFormat, FM.logFormat,
-              MMI.logFormat]
+              MMI.logFormat {- , MonAp.logFormat-}]
 
 main ∷ IO ()
 main = cliMergerMain logMerger vsgsnDefaults logFormats

@@ -10,8 +10,10 @@ import Data.Attoparsec.ByteString.Char8 (
   , signed
   , isEndOfLine
   , endOfLine
+  , endOfInput
   , char8
-  , takeTill
+  , skipWhile
+  , match
   )
 import qualified Data.ByteString.Lazy.Internal as B
 import Text.LogMerger.Types
@@ -20,7 +22,8 @@ import Text.LogMerger.Logs.Util
 import Pipes
 import Pipes.Dissect
 import Prelude hiding (takeWhile)
-
+import Control.Applicative
+    
 logFormat ∷ LogFormat
 logFormat = LogFormat {
     _dissector = cliDissector 
@@ -35,7 +38,7 @@ cliDissector = evalStateT diss
   where diss = tillEnd $ do  
           day ← yymmdd <* skipSpace
           time ← hhmmss <* ","
-          txt ← takeTill (=='\n') <* endOfLine
+          (txt, _) ← match $ skipWhile (/='\n') <* (endOfLine <|> endOfInput)
           return BasicLogEntry {
               _basic_origin = []
             , _basic_date = UTCTime {

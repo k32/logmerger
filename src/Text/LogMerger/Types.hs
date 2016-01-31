@@ -19,6 +19,7 @@ import Data.Data
 import Data.Typeable
 import Data.ByteString.Internal (c2w, w2c)
 import Control.Lens
+import qualified Data.Map as M
 
 type DateTime = UTCTime
 
@@ -38,7 +39,13 @@ data BasicLogEntry o =
     _basic_date   ∷ DateTime
   , _basic_origin ∷ [Origin o]
   , _basic_text   ∷ B.ByteString
-  } deriving (Eq, Data, Typeable)
+  } | -- TODO: this is ugly!
+  DataStreamEntry {
+    _ds_date   ∷ DateTime
+  , _ds_origin ∷ [Origin o]
+  , _ds_data   ∷ M.Map String Double
+  }
+  deriving (Eq, Data, Typeable)
 makeLenses ''BasicLogEntry
 
 instance (Eq o) ⇒ Ord (BasicLogEntry o) where

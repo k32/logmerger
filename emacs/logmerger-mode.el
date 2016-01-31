@@ -16,41 +16,25 @@
 
 (cl-defstruct logmerger-origin (boring nil) face)
 
-(defmacro logmerge-transform-record (getter setter field transform)
-  )
+(defmacro logmerger-read-table-record (table field key)
+  (let ((val (make-symbol "val")))
+      `(let ((,val (cdr (assoc-string ,key ,table))))
+         (if ,val
+             (,field val)
+           nil))))
 
-(defmacro logmerger-conf (table key &optional field area transform)
-  "Get value from the ``table''. Table may be default or buffer-local.\
-  \Buffer local bindings override default ones unless ``area'' is\
-  \specified explicitly."
-  (let* ((table-s (concat "logmerger-" (symbol-name table)))
-         (table-prefixed (intern table-s))
-         (accessor (intern (concat table-s "-" (symbol-name field))))
-         (trans (if transform
-                    transform
-                  `(lambda (a) a)))
-         (access (if field
-                     accessor
-                   `(lambda (a) a)))
-         (read-tab-local `(cdr (assoc-string ,key ,table-prefixed)))
-         (read-tab-default `(cdr (assoc-string ,key (default-value (quote ,table-prefixed)))))
-         (read-table (pcase area
-                       (`nil  `(let ((local ,read-tab-local)
-                                     (default ,read-tab-default))
-                                 (if local
-                                     local
-                                   default)))
-                       (`default read-tab-default)
-                       (`local read-tab-local)))
-         (only-access `(let ((val ,read-table))
-                         (if val
-                             (,access val))))
-         (transform-local `())
-         (do-transform ()))
-    (if transform
-        do-transform
-      only-access)))
-   
+(defmacro logmerger-update-table-record (table field key function)
+  (let* ((lookuper `(cdr (assoc-string ,key ,table)))
+         (accessor `(,field ,lookuper))
+         (entry (make-symbol "entry"))
+         (entry2 (make-symbol "entry2")))
+    `(let* ((,entry ,lookuper)
+            (,entry2 (if entry
+                         (funcall ,function (,field ,entry))
+                       (funcall ,function nil))))
+       (if ,entry
+           (setf ,accessor ,entry2)))))
+
 (defun logmerger-make-header-re (date time origin)
   "Construct a regular expression matching specific or any entry header"
   (concat logmerger-re-begin-entry
@@ -72,6 +56,10 @@
     (re-search-backward logmerger-re-entry-header)
     (let ((date (parse-time-string (match-string 1)))
           (origin (match-string 2)))
+      (unless (assoc-string origin logmerger-origins)
+        (add-to-list 'logmerger-origins `(,origin ,(make-logmerger-origin
+                                                    :boring nil
+                                                    :face nil))))
       (make-logmerger-entry :timestamp date :origin origin))))
 
 (defvar logmerger-highlights
@@ -86,13 +74,14 @@
                 (`forward `(progn (end-of-line)
                                   (re-search-forward logmerger-re-entry-header)))
                 (`backward `(progn (beginning-of-line)
-                                   (re-search-backward logmerger-re-entry-header))))))
+                                   (re-search-backward logmerger-re-entry-header)))))
+        (old-state (make-symbol "old-state")))
     `(progn
        (let 
-           ((old-state (logmerger-current-entry-info)))
+           ((,old-state (logmerger-current-entry-info)))
          ,jump
          (dotimes (i ,n)
-           (while (not (funcall ,stopp old-state (logmerger-current-entry-info)))
+           (while (not (funcall ,stopp ,old-state (logmerger-current-entry-info)))
              ,jump))
          (recenter)))))
 
@@ -106,43 +95,64 @@
        ,(when key
           `(define-key logmerger-mode-map (kbd ,key) (quote ,full-name))))))
 
+
 ;; Boring origins
-(defun logmerger-boring-origin-set (p)
-  "Declare current origin as ``boring''."
+(defun logmerger-toggle-boring-origin (p)
+  "Declare current origin as `boring'"
+  ;; Nasty hack: current-entry-info initializes origin entry for us
+  ;; update-table-record is a better place for this
   (interactive "p")
-  (if (= p 1)
-      ()))
-  
+  (let* ((origin (logmerger-entry-origin (logmerger-current-entry-info)))
+         (update-fun (lambda (current-status)
+                       (if current-status
+                           (progn (message "%s is not boring anymore" origin)
+                                  nil)
+                         (progn (message "%s is now boring" origin)
+                                t)))))
+    (logmerger-update-table-record logmerger-origins
+                                   logmerger-origin-boring
+                                   origin
+                                   update-fun)))
 
-;; Just go back and forth
+(define-derived-mode logmerger-mode text-mode "Log"
+  "Major mode for viewing LogMerger output"
+  (read-only-mode t)
+  (setq font-lock-defaults '(() nil nil nil logmerger-highlights))
+  (setq logmerger-origins '()))
 
-(logmerger-defgo "" "" "SPC" forward (lambda (a b) t))
-(logmerger-defgo "" "" "<backspace>" backward (lambda (a b) t))
+(define-key logmerger-mode-map (kbd "b") 'logmerger-toggle-boring-origin)
+
+;; Just go back and forth skipping "boring" entries
+
+(defun logmerger-go-not-boring(a o)
+  "Match entries which are not boring")
+
+(logmerger-defgo "" "" "SPC" forward
+                 (lambda (a b) t))
+(logmerger-defgo "" "" "<backspace>" backward
+                 (lambda (a b) t))
 
 ;; Go to the same origin
 (defun logmerger-same-origin (a b)
   (equal (logmerger-entry-origin b) (logmerger-entry-origin a)))
 
-(logmerger-defgo "-origin" " to an entry with the same origin" "RET"
+(logmerger-defgo "-origin" " to an entry with the same origin" "]"
                  forward 'logmerger-same-origin)
-(logmerger-defgo "-origin" " to an entry with the same origin" "S-RET"
+(logmerger-defgo "-origin" " to an entry with the same origin" "["
                  backward 'logmerger-same-origin)
 
 ;; Time
-(defmacro logmerger-go-dt (direction dt)
-  `(lambda (a b)
-     (let* ((ta (apply 'encode-time (logmerger-entry-timestamp a)))
-            (tb (apply 'encode-time (logmerger-entry-timestamp b)))
-            (this-dt ,(pcase direction
-                        (`forward `(- tb ta))
-                        (`backward `(- ta tb)))))
-       (>= this-dt ,dt))))
+;; (defmacro logmerger-go-dt (direction dt)
+;;   (let ((ta (make-symbol "ta"))
+;;         (tb (make-symbol "tb")))
+;;   `(lambda (a b)
+;;      (let* ((,ta (apply 'encode-time (logmerger-entry-timestamp a)))
+;;             (,tb (apply 'encode-time (logmerger-entry-timestamp b)))
+;;             (this-dt ,(pcase direction
+;;                         (`forward `(- ,tb ,ta))
+;;                         (`backward `(- ,ta ,tb)))))
+;;        (>= this-dt ,dt)))))
 
 (logmerger-defgo "-minute" "" "m" forward (logmerger-go-dt forward 60))
-
-(define-derived-mode logmerger-mode text-mode "Log"
-  "Major mode for viewing LogMerger output"
-  (read-only-mode t)
-  (setq font-lock-defaults '(() nil nil nil logmerger-highlights)))
 
 (provide 'logmerger-mode)

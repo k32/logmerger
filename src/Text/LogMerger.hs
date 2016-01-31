@@ -211,10 +211,10 @@ asUnixTime udt dt fn e@BasicLogEntry{_basic_origin = o, _basic_date = d} =
   e{_basic_origin = Location fn : o, _basic_date = (dt + udt) `addUTCTime` d}
 
 asUTCTime ∷ NominalDiffTime
-           → NominalDiffTime
-           → String
-           → SGSNBasicEntry
-           → SGSNBasicEntry
+          → NominalDiffTime
+          → String
+          → SGSNBasicEntry
+          → SGSNBasicEntry
 asUTCTime tz dt fn e@BasicLogEntry{_basic_origin = o, _basic_date = d} =
   e{_basic_origin = Location fn : o, _basic_date = (dt + tz) `addUTCTime` d}
 
