@@ -18,6 +18,7 @@ import Data.Attoparsec.ByteString.Char8 (
   , char8
   , (<?>)
   , Parser
+  , match
   )
 import qualified Data.ByteString.Lazy.Internal as B
 import Text.LogMerger.Types
@@ -41,7 +42,7 @@ logEntry = do
   day ← yymmdd <* skipSpace
   time ← hhmmss <* skipSpace
   off ← "UTC" *> signed decimal <* (skipSpace >> ";") -- TODO: do something with off
-  txt ← takeTill (=='\n') <* (endOfLine <|> endOfInput)
+  (txt, _) ← match $ takeTill (=='\n') *> (endOfLine <|> endOfInput)
   return BasicLogEntry {
         _basic_origin = []
       , _basic_date = UTCTime {

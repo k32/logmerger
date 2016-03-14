@@ -31,7 +31,7 @@ fmaDissector = tillEnd $ do
   skipWhile isSpace
   day ← (yymmdd <* skipWhile isSpace) <?> "Day"
   time ← (hhmmss <* ";") <?> "Time"
-  rest ← (takeTill (=='\n') <* "\n") <?> "rest"
+  (rest, _) ← (match $ (takeTill (=='\n') <* "\n")) <?> "rest"
   return BasicLogEntry {
       _basic_origin = []
     , _basic_date = UTCTime {

@@ -13,7 +13,7 @@
   ".*")
 
 (defconst logmerger-re-line-begin
-  "|.*|")
+  "^|[^|]*|")
 
 (cl-defstruct logmerger-entry timestamp origin)
 
@@ -123,19 +123,20 @@
   :group 'logmerger)
 
 (defcustom logmerger-severe-accidents
-  '("node_restart.*"
+  '("\\(node\\|small\\|large\\)_restart.*"
     "restart_node.*"
     "restart_dpe.*"
     "isp\\.log"
+    "capsule_failure.*"
+    "ncb_failover.*"
     )
   "Severe incidents"
   :type '(repeat string)
   :group 'logmerger)
   
 (defcustom logmerger-errors
-  '(".*\\(ERROR\\|CRASH\\) +\\(REPORT\\)?.*"
-    "error"
-    ".*capsule_failure.*")
+  '("\\(ERROR\\|CRASH\\) +\\(REPORT\\).*"
+    "error")
   "Regex matching severe errors"
   :type '(repeat string)
   :group 'logmerger)
@@ -152,8 +153,7 @@
         (,(concat logmerger-re-begin-entry ".*") . logmerger-entry-header-face)
         (,(logmerger-merge-regexes logmerger-errors) . logmerger-error-face)
         (,(logmerger-merge-regexes logmerger-severe-accidents) . logmerger-severe-accident-face)
-        (,(logmerger-merge-regexes logmerger-user-intervention) . logmerger-user-intervention-face)
-        ))
+        (,(logmerger-merge-regexes logmerger-user-intervention) . logmerger-user-intervention-face)))
 
 ;;;; Moving around ;;;;
 
