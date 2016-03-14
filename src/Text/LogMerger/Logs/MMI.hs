@@ -21,6 +21,7 @@ import Data.Attoparsec.ByteString.Char8 (
   , Parser
   , anyChar
   , takeTill
+  , option
   )
 import Data.Attoparsec.Combinator
 import Data.Attoparsec.Combinator.Skip
@@ -48,15 +49,15 @@ entry = do
         skipSpace
         (d, t) ← header_old <|> header_new
         return (reqrepl, d, t)
-      header_old = do
+      header_old = (flip (<?>)) "header_old" $ do
         d ← ("Date:" *> yymmdd' "/" <* ",") <?> "header_old/date"
         t ← (skipSpace >> "Time:" *> hhmmss) <?> "header_old/time"
         return (d, t)
-      header_new = do
-        "Timestamp:"
+      header_new = (flip (<?>)) "header_new" $ do
+        (option "" "Timestamp:") <?> "Timestamp" -- TODO Is it really needed?
         d ← yymmdd <* "T" <?> "header_new/date"
         t ← hhmmss <?> "header_new/time"
-        "Z"
+        "Z" <?> "Z"
         return (d, t)
   (reqrepl, d, t) ← header
   txt ← matchManyTill anyChar (() <$ header <|> endOfInput)

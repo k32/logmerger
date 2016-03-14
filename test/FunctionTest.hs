@@ -112,11 +112,16 @@ prop_CLILogParse (chunkSize, ltOffset, l) =
     printEntry BasicLogEntry {
         _basic_date = d
       , _basic_text = t
-      } = concat [formatTime defaultTimeLocale "%F %T" d, ",", byteStringToString t, "\n"] 
+      } = concat [formatTime defaultTimeLocale "%F %T" d, ",", byteStringToString t] 
     pprint = fromString $ l >>= printEntry
     parser = _dissector CLI.logFormat
   in
-    all isOneLiner l ==> okParser pprint chunkSize parser l
+    all isOneLiner l ==> okParser pprint chunkSize parser (map newlinify l)
+
+-- This is ugly. Need to be changed 
+newlinify ∷ SGSNBasicEntry
+          → SGSNBasicEntry
+newlinify a@BasicLogEntry{_basic_text = t} = a{_basic_text = B.append t "\n"}
 
 prop_IspLogParse ∷ (Word, Int, [SGSNBasicEntry])
                  → Property
@@ -125,14 +130,14 @@ prop_IspLogParse (chunkSize, ltOffset, l) =
     printEntry BasicLogEntry {
         _basic_date = d
       , _basic_text = t
-      } = concat [formatTime defaultTimeLocale "%F %T UTC%z" d, ";", byteStringToString t, "\n"] 
+      } = concat [formatTime defaultTimeLocale "%F %T UTC%z" d, ";", byteStringToString t] 
     pprint = fromString $ concat [
         "Content of isp.log\n==================\n"
       , l >>= printEntry
       ]
     parser = _dissector ISP.logFormat
   in
-    all isOneLiner l ==> okParser pprint chunkSize parser l
+    all isOneLiner l ==> okParser pprint chunkSize parser (map newlinify l)
 
 prop_RibgbufferParse ∷ (Int, Word, String, [EasyMode], [(Word8, SGSNBasicEntry)]) 
                      → Property
