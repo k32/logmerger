@@ -1,0 +1,1 @@
+-- Declarative pipeline generation
