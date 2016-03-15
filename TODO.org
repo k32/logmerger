@@ -1,0 +1,21 @@
+* TODO Logs
+** TODO [#B] Linux (syslog, dmesg, security)
+** TODO [#C] VxWorks
+** TODO [#B] COM
+** TODO [#B] Erlang trace
+* TODO Filtering
+
+** TODO [#C] Consider Unix-wayish tools?
+#+BEGIN_SRC bash
+TZINFO="../tzinfo"
+(lmcat cli_log/* && lmcat other.log) | lmgrep -t -1h | lmgrep -T Erlang
+#+END_SRC
+
+Probably this will require either 
+ - dirty hackery ("lazy evaluation": when output is a fifo, just send the command downstream) or 
+ - actual sorting of the entries
+
+** TODO [#A] SQL-ish filter
+Is there "parsec-sql"? Implementing grammar from scratch is not cool.
+
+* TODO Code mapping
