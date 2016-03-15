@@ -42,6 +42,8 @@ logFormat = LogFormat {
 myDissector ∷ LogDissector
 myDissector = evalStateT $ tillEnd entry
 
+-- TODO: Would be faster to determine the log format once and avoid
+-- constant branching
 entry ∷ Parser SGSNBasicEntry
 entry = do
   let header = do
