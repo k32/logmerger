@@ -69,7 +69,7 @@
 ;;    (list (list logmerger-re-begin-entry '(1 font-lock-string-face))
 ;;          (list logmerger-re-line-begin '(1 font-lock-comment-face))))
 
-;(defcustom logmerger-severity-levels 
+;(defcustom logmerger-severity-levels
 
 
 (defface logmerger-error-face
@@ -133,18 +133,18 @@
   "Severe incidents"
   :type '(repeat string)
   :group 'logmerger)
-  
+
 (defcustom logmerger-errors
   '("\\(ERROR\\|CRASH\\) +\\(REPORT\\).*"
     "error")
   "Regex matching severe errors"
   :type '(repeat string)
   :group 'logmerger)
-  
+
 (defun logmerger-merge-regexes (l)
-  (reduce 
+  (reduce
    (lambda (a b) (concat a "\\|" b))
-   (mapcar 
+   (mapcar
     (lambda (a) (concat "\\(" a "\\)"))
     l)))
 
@@ -166,7 +166,7 @@
                                    (re-search-backward logmerger-re-entry-header)))))
         (old-state (make-symbol "old-state")))
     `(progn
-       (let 
+       (let
            ((,old-state (logmerger-current-entry-info)))
          ,jump
          (dotimes (i ,n)
@@ -176,7 +176,7 @@
 
 (defmacro logmerger-defgo (fun-name description key direction stopp)
   (let ((full-name (intern (concat "logmerger-go-" (symbol-name direction) fun-name))))
-    `(progn 
+    `(progn
        (defun ,full-name (n)
          ,(concat "Go " (symbol-name direction) description)
          (interactive "p")
@@ -206,7 +206,7 @@
 (define-derived-mode logmerger-mode text-mode "Log"
   "Major mode for viewing LogMerger output"
   (read-only-mode t)
-  (setq-local font-lock-defaults 
+  (setq-local font-lock-defaults
               '(logmerger-highlights))
   (setq-local logmerger-origins '())
   (make-local-variable 'logmerger-symbols))
@@ -234,7 +234,7 @@
 
 (defun logmerger-go-next-error (n)
   (interactive "p")
-  (dotimes (i n) 
+  (dotimes (i n)
     (re-search-forward (logmerger-merge-regexes logmerger-errors))))
 
 
@@ -242,10 +242,48 @@
 
 (defun logmerger-go-prev-error (n)
   (interactive "p")
-  (dotimes (i n) 
+  (dotimes (i n)
     (re-search-backward (logmerger-merge-regexes logmerger-errors))))
 
 (define-key logmerger-mode-map (kbd "E") 'logmerger-go-prev-error)
+
+(defun logmerger-create-initialize-buffer (name hook)
+  (unless (get-buffer name)
+    (let ((prev-buffer (buffer-name)))
+      (get-buffer-create name)
+      (set-buffer name)
+      (funcall hook)
+      (set-buffer prev-buffer))))
+
+(define-derived-mode logmerger-pattern-mode text-mode "Pattern"
+  "Major mode for editing patterns")
+
+(defun logmerger-pattern-run ()
+  (interactive)
+  (let* ((lines (split-string (buffer-string) "\n" t))
+         (regexpp (lambda (str) 
+                    (string-match "^\\(\\)$" str)))
+         (simple-words (remove-if regexpp lines))
+         (regexes (remove-if-not regexpp lines))
+         (regex1 (regexp-opt simple-words))
+         (regex2 (logmerger-merge-regexes (cons regex1 regexes))))
+    (message regex2)
+    (message orig-buffer)
+    (set-buffer orig-buffer)
+    (occur regex2)))
+         
+(define-key logmerger-pattern-mode-map (kbd "C-c C-c") 'logmerger-pattern-run)
+
+(defun logmerger-occur ()
+  (interactive)
+  (let ((buf-name (concat "*" (buffer-name) "-pattern*"))
+        (orig-buffer2 (buffer-name)))
+    (logmerger-create-initialize-buffer buf-name
+                                        (lambda ()
+                                          (logmerger-pattern-mode)
+                                          (setq-local orig-buffer orig-buffer2)
+                                          (message orig-buffer)))
+    (switch-to-buffer-other-window buf-name)))
 
 ;; Time
 ;; (defmacro logmerger-go-dt (direction dt)
@@ -266,4 +304,3 @@
   ())
 
 (provide 'logmerger-mode)
-
