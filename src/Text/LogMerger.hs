@@ -30,21 +30,30 @@ import Control.Monad
 import Control.Monad.Warning
 import Control.Monad.Reader
 import Data.IORef
-import Data.List (find)
+import Data.List (find, isPrefixOf)
 import Data.Maybe (isJust)
 import Data.Function (on)
 import Data.Either (lefts, rights)
 import qualified Data.ByteString as B
 import System.IO
 
+data MergeSame = NoMergeSame | ConservativeMerge | AgressiveMerge
+               deriving (Show)
+
 data Input =
   Input {
     _fileName ∷ String
   , _format ∷ Maybe String
   , _timeOffset ∷ NominalDiffTime
-  , _mergeSame ∷ Bool
+  , _mergeSame ∷ MergeSame
   } deriving (Show)
 makeLenses ''Input
+
+readMergeSame :: String -> MergeSame
+readMergeSame "" = NoMergeSame
+readMergeSame a | isPrefixOf a "conservative" = ConservativeMerge
+                | isPrefixOf a "agressive"    = AgressiveMerge
+                | otherwise                   = error "LogMerger: --merge-same parameter should be either \"conservative\" or \"agressive\""
 
 data LogMerger i = 
   LogMerger {
@@ -55,8 +64,8 @@ data LogMerger i =
   , _lmVerbosity      ∷ Int                   -- ^ Level of debug messages
   , _g_tzInfo         ∷ Maybe String          -- ^ Use this tzinfo file by default for all files
   , _g_timeZone       ∷ Maybe NominalDiffTime -- ^ Store parsed tzinfo there
-  , _g_mergeSame      ∷ Bool                  -- ^ Set whether entries of the same time and origin
-                                              --   Should be merged
+  , _g_mergeSame      ∷ MergeSame             -- ^ Set whether entries of the same time and origin
+                                               --   Should be merged
   , _g_follow         ∷ Bool                  -- ^ Imitate "tail -f" behaviour
   , _g_followInterval ∷ Int                   -- ^ How often input files should be refreshed
   } deriving (Show)
@@ -75,7 +84,7 @@ cliAttr s0 = CliDescr {
     , CliParam "timezone" (Just 'z') "Timezone (UTC ± minutes)" $ 
         CliParameter (g_timeZone :$ (Just . fromIntegral . (*60) . read)) "TIME"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $ 
-        CliFlag g_mergeSame
+        CliParameter (g_mergeSame :$ readMergeSame) "c[onservative] or a[gressive]"
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
         CliFlag g_follow
     , CliParam "header" Nothing "Header format of entries" $ 
@@ -91,7 +100,7 @@ cliAttr s0 = CliDescr {
     , CliParam "offset" (Just 'o') "Specify time offset for a log" $ 
         CliParameter (timeOffset :$ (fromInteger . read)) "SECONDS"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $
-        CliFlag mergeSame
+        CliParameter (mergeSame :$ readMergeSame) "c[onservative] or a[gressive]"
     ]
   }
   where
@@ -113,7 +122,7 @@ cliDefaults = LogMerger {
   , _lmVerbosity = 0
   , _g_tzInfo = Nothing
   , _g_timeZone = Nothing
-  , _g_mergeSame = False
+  , _g_mergeSame = NoMergeSame
   , _g_follow = False
   , _g_followInterval = 1000000
   }
@@ -182,9 +191,10 @@ openLog logFormats unixTimeOffset timezone inputSpec = do
   follow' ← view (myConfig . g_follow) >>= \case
               True → follow <$> view (myConfig . g_followInterval)
               False → return id
-  let mergeSamePipe = if mgs
-                        then mergeSameOrigin
-                        else id
+  let mergeSamePipe = case mgs of
+                        AgressiveMerge -> agressiveMergeSameOrigin
+                        ConservativeMerge -> conservativeMergeSameOrigin
+                        NoMergeSame -> id
       -- Post process pipe does time conversion and adds filename to the origin
       postProcessPipe = refactorMe $ case timeAs of
                                        AsLocalTime → asLocalTime dt fn

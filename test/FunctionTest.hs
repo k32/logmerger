@@ -185,9 +185,9 @@ prop_interleaveSorting l = isSorted l'
   where (_, l') = sink $ interleave $ map mkLogEntries l
         mkLogEntries (o, s) = each $ sort s
 
-prop_mergeSameContentConservation ∷ [(String, UTCTime, [String])] 
-                                  → Property
-prop_mergeSameContentConservation l = (length e == length e') .&&. all eq (zip e e')
+prop_agressiveMergeSameContentConservation ∷ [(String, UTCTime, [String])] 
+                                           → Property
+prop_agressiveMergeSameContentConservation l = (length e == length e') .&&. all eq (zip e e')
   where mkLogEntries = each [BasicLogEntry {
                                _basic_date = d
                              , _basic_origin = [Location o]
@@ -198,7 +198,7 @@ prop_mergeSameContentConservation l = (length e == length e') .&&. all eq (zip e
              , _basic_origin = [Location o]
              , _basic_text = fromString $ concat s
              } | (o, d, s) ← l, not (null s)]
-        (_, e') = sink $ mergeSameOrigin mkLogEntries
+        (_, e') = sink $ agressiveMergeSameOrigin mkLogEntries
         eq (a, b) = (_basic_origin a) == (_basic_origin b) &&
                     (_basic_date a) == (_basic_date b) &&
                     (B.length $ _basic_text a) == (B.length $ _basic_text b)
@@ -206,9 +206,31 @@ prop_mergeSameContentConservation l = (length e == length e') .&&. all eq (zip e
   -- so the testcase is potentially unstable.
   -- But I neglect it for now
 
+prop_conservativeMergeSameContentConservation ∷ [(String, UTCTime, [String])] 
+                                              → Property
+prop_conservativeMergeSameContentConservation l = (length e == length e') .&&. all eq (zip e e')
+  where mkLogEntries = each [BasicLogEntry {
+                               _basic_date = d
+                             , _basic_origin = [Location o]
+                             , _basic_text = fromString i
+                             } | (o, d, s) ← l, i ← s]
+        e = [BasicLogEntry {
+               _basic_date = d
+             , _basic_origin = [Location o]
+             , _basic_text = fromString $ concat s
+             } | (o, d, s) ← l, not (null s)]
+        (_, e') = sink $ conservativeMergeSameOrigin mkLogEntries
+        eq (a, b) = (_basic_origin a) == (_basic_origin b) &&
+                    (_basic_date a) == (_basic_date b) &&
+                    (B.length $ _basic_text a) == (B.length $ _basic_text b)
+  -- There's a little probability that 'Arbitrary' generates same date and origin,
+  -- so the testcase is potentially unstable.
+  -- But I neglect it for now
+                                               
 merging = testGroup "Log merging" [
             testProperty "interleave: Conservation of the number of entities" prop_nEntitiesConservation
-          , testProperty "mergeSameOrigin: Conservation of content length" prop_mergeSameContentConservation
+          , testProperty "agressiveMergeSameOrigin: Conservation of content length" prop_agressiveMergeSameContentConservation
+          , testProperty "conservativeMergeSameOrigin: Conservation of content length" prop_conservativeMergeSameContentConservation
           , testProperty "interleave: Ordering" prop_interleaveSorting
           ]
 
