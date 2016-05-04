@@ -291,6 +291,8 @@
                                           (message orig-buffer)))
     (switch-to-buffer-other-window buf-name)))
 
+(define-key logmerger-mode-map (kbd "o") 'logmerger-occur)
+
 ;; Time
 ;; (defmacro logmerger-go-dt (direction dt)
 ;;   (let ((ta (make-symbol "ta"))

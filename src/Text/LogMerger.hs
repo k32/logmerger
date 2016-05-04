@@ -1,5 +1,5 @@
 {-# LANGUAGE UnicodeSyntax, TemplateHaskell, LambdaCase, FlexibleContexts,
-             RankNTypes #-}
+             RankNTypes, OverloadedStrings #-}
 module Text.LogMerger (
     module Pipes
   , module Text.LogMerger.Types
@@ -273,6 +273,8 @@ cliMergerMain' logFormats = do
       parsingErrors r = do
         lift . printInfo 2 $ "Parsers returned: " ++ show r
         lift . warning . map show $ lefts r
+  {- Emacs-specific hack, to be removed when proper solution is implemented -}
+  runEffect $ yield "-*- mode: logmerger-*-" >-> sink 
   runEffect $ (parsingErrors =<< merged)
           >-> ("Broken pretty printer pipe." <! pprint)
           >-> ("Broken sink pipe." <! sink)
@@ -323,7 +325,7 @@ helpPostamble logFormats = unlines $ concat [
     , "  ${s}  - severity"
     , ""
     , "NOTES:"
-    , "  Please note that --merge-same flag may cause reordering of log"
+    , "  Please note that '--merge-same agressive' may cause reordering of log"
     , "  entries recorded at the same time."
     ]
   ]
