@@ -35,7 +35,9 @@ import Data.Maybe (isJust)
 import Data.Function (on)
 import Data.Either (lefts, rights)
 import qualified Data.ByteString as B
+import Text.Read (readMaybe)
 import System.IO
+import Debug.Trace
 
 data MergeSame = NoMergeSame | ConservativeMerge | AgressiveMerge
                deriving (Show)
@@ -63,7 +65,7 @@ data LogMerger i =
   , _lineFormat       ∷ String
   , _lmVerbosity      ∷ Int                   -- ^ Level of debug messages
   , _g_tzInfo         ∷ Maybe String          -- ^ Use this tzinfo file by default for all files
-  , _g_timeZone       ∷ Maybe NominalDiffTime -- ^ Store parsed tzinfo there
+  , _g_timeZone       ∷ Maybe String          -- ^ Timezone (difference between UTC and localtime in [+-]hhmm format)
   , _g_mergeSame      ∷ MergeSame             -- ^ Set whether entries of the same time and origin
                                                --   Should be merged
   , _g_follow         ∷ Bool                  -- ^ Imitate "tail -f" behaviour
@@ -82,7 +84,7 @@ cliAttr s0 = CliDescr {
     , CliParam "tzinfo" (Just 'i') "Path to an SGSN-MME tzinfo file" $ 
         CliParameter (g_tzInfo :$ Just) "FILE"
     , CliParam "timezone" (Just 'z') "Timezone (UTC ± minutes)" $ 
-        CliParameter (g_timeZone :$ (Just . fromIntegral . (*60) . read)) "TIME"
+        CliParameter (g_timeZone :$ Just) "TIME"
     , CliParam "merge-same" (Just 'm') "Merge entries of the same origin and time" $ 
         CliParameter (g_mergeSame :$ readMergeSame) "c[onservative] or a[gressive]"
     , CliParam "follow" (Just 'f') "Monitor updates of log files a la 'tail -f'" $ 
@@ -171,6 +173,18 @@ refactorMe f p = do
       yield $ f x
       refactorMe f p'
 
+parseTimeZone ∷ String → Maybe NominalDiffTime
+parseTimeZone tz@ ~(sign:h1:h2:mm) = do
+  guard $ 5 == length tz
+  sign' ← case sign of
+            '-' → return '-'
+            '+' → return ' ' -- TODO: Hack hack hack
+            _   → Nothing
+  hh ← (readMaybe [sign',h1,h2]) :: Maybe Integer
+  mm ← (readMaybe mm) :: Maybe Integer
+  guard $ mm <= 60 && abs hh <= 23
+  return $ realToFrac $ secondsToDiffTime $ (hh*60 + mm) * 60
+
 -- TODO: Refactor me
 openLog ∷ (MonadWarning [String] String m, MonadIO m, Functor m, MonadReader GlobalVars m)
         ⇒ [LogFormat]
@@ -256,17 +270,21 @@ cliMergerMain' logFormats = do
     , _g_timeZone = tz
     } ← asks _myConfig
   pprint ← makeLogEntryPP hf lf
-  localTimeOffset ← case tz of 
-    Just tz' → return tz'
-    Nothing  → case tzf of
-      Nothing   → return 0
-      Just tzf' → errorToWarning (:[]) (const $ return 0) $ readTzInfo tzf'
+  localTimeOffset ← case tzf of
+                      Nothing   → return 0
+                      Just tzf' → errorToWarning (:[]) (const $ return 0) $ readTzInfo tzf'
   printInfo 3 =<< ("Configuration: " ++) . show <$> asks _myConfig
   printInfo 1 $ "POSIX time offset: " ++ (show localTimeOffset)
   sink ← case outputFile of
     "-" → return P.stdout
     _   → P.toHandle <$> openFile'' outputFile WriteMode
-  let timezone = 0 -- TODO
+  timezone ← case (tz, tz >>= parseTimeZone) of
+               (Nothing, _) → return 0
+               (Just tz', Nothing) → do
+                 printWarning $ "Could not parse time zone: " ++ tz'
+                 return 0
+               (_, Just tz') → return tz'
+  printInfo 1 $ "Timezone offset: " ++ (show timezone)
   logs ← errorsToWarnings (:[]) $ map (openLog logFormats localTimeOffset timezone) inputFiles
   {- Building the pipeline -}
   let merged = interleaveBy (compare `on` _basic_date) logs
@@ -329,3 +347,4 @@ helpPostamble logFormats = unlines $ concat [
     , "  entries recorded at the same time."
     ]
   ]
+

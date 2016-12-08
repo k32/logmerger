@@ -259,6 +259,16 @@
 (define-derived-mode logmerger-pattern-mode text-mode "Pattern"
   "Major mode for editing patterns")
 
+;; (defvar logmerger-pattern-template-dir
+;;   ( ""))
+
+;; (defun logmerger-pattern-list-templates ()
+;;   "One can define a number of filter templates which are stored
+;; in .emacs.d/occur-templates directory."
+;;   (interactive)
+;;   (let* ((templ-list ())
+;;          (templ (completing-read "Template:" templ-list nil t)))
+
 (defun logmerger-pattern-run ()
   (interactive)
   (let* ((lines (split-string (buffer-string) "\n" t))
@@ -307,8 +317,8 @@
 
 (logmerger-defgo "-minute" "" "m" forward (logmerger-go-dt forward 60))
 
-(defun logmerger-add-symbol-to-overview ()
-  (interactive)
-  ())
+;; (defun logmerger-add-symbol-to-overview ()
+;;   (interactive)
+;;   ())
 
 (provide 'logmerger-mode)
